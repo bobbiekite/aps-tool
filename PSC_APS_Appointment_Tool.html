@@ -949,9 +949,9 @@ function handleCSV(input) {
   reader.onload = (e) => {
     const text = e.target.result;
     const rows = parseCSV(text);
-    // Qualtrics exports two header rows — skip the label row (index 1)
-    if (rows.length < 3) { toast('CSV appears empty or invalid', 'error'); return; }
-    appState.csvData = [rows[0], ...rows.slice(2)];
+    // Qualtrics exports three header rows (column names, labels, ImportId JSON) — skip all three
+    if (rows.length < 4) { toast('CSV appears empty or invalid', 'error'); return; }
+    appState.csvData = [rows[0], ...rows.slice(3)];
     // Apply hardcoded mapping — no manual mapping needed
     appState.columnMapping = { ...HARDCODED_MAPPING };
     saveState();
