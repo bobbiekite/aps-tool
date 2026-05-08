@@ -833,6 +833,7 @@
       <div class="flex gap-8 items-center">
         <button class="btn btn-gold btn-sm no-print" onclick="printRecord()">🖨 Print / PDF</button>
         <button class="btn btn-secondary btn-sm no-print" id="interview-guide-btn" onclick="openInterviewGuide()" style="display:none">📋 Interview Guide</button>
+        <button class="btn btn-sm no-print" style="background:var(--crimson-pale);color:var(--crimson);border:1px solid var(--crimson)" onclick="deleteCandidate(appState.currentRecordId)">🗑 Delete</button>
         <button class="modal-close" onclick="closeModal()">✕</button>
       </div>
     </div>
@@ -1180,13 +1181,7 @@ async function runBatch() {
     // Skip any row that isn't a real Qualtrics response ID
     if (!responseId || !responseId.startsWith('R_')) continue;
 
-    // Skip already processed
-    if (appState.candidates[responseId]?.aiAssessment) {
-      logProgress(`⟶ Skipping ${getField(row,'firstName')} ${getField(row,'lastName')} (already processed)`, 'info');
-      processed++;
-      updateProgress(processed, rows.length);
-      continue;
-    }
+    // Note: re-running will update surveyData and AI assessment but preserve dean notes
 
     const name = `${getField(row,'firstName')} ${getField(row,'lastName')}`.trim() || responseId;
     logProgress(`Processing ${name}…`);
@@ -1272,6 +1267,8 @@ async function processCandidate(row, responseId) {
   const assessment = await callClaudeAssessment(firstName, lastName, surveySummary, cvText, responseId);
 
   // Store candidate
+  // Always update core data from current CSV row (preserves notes/decisions)
+  const freshSurveyData = buildSurveyDataObject(row);
   if (!appState.candidates[responseId]) {
     appState.candidates[responseId] = {
       responseId,
@@ -1279,12 +1276,18 @@ async function processCandidate(row, responseId) {
       lastName,
       email,
       surveyDate: new Date().toLocaleDateString(),
-      surveyData: buildSurveyDataObject(row),
+      surveyData: freshSurveyData,
       stage: 'pending',
       deanDecision: '',
       deanNotes: {},
       opsNotes: ''
     };
+  } else {
+    // Update name/email/surveyData but preserve notes and decisions
+    appState.candidates[responseId].firstName = firstName;
+    appState.candidates[responseId].lastName = lastName;
+    appState.candidates[responseId].email = email;
+    appState.candidates[responseId].surveyData = freshSurveyData;
   }
 
   appState.candidates[responseId].aiAssessment = assessment;
@@ -1586,7 +1589,10 @@ function renderTableRow(c) {
     <td><span class="${industryClass}">${industryCurrency}</span></td>
     <td><span class="stage-badge ${stageClass}"><span class="stage-dot"></span>${stageLabel}</span></td>
     <td>${c.cvAvailable ? '✓' : '<span class="text-faint">—</span>'}</td>
-    <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRecord('${c.responseId}')">Open →</button></td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openRecord('${c.responseId}')">Open →</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--crimson)" onclick="event.stopPropagation();deleteCandidate('${c.responseId}')">🗑</button>
+    </td>
   </tr>`;
 }
 
@@ -1818,6 +1824,18 @@ function updateStage(responseId, stage) {
   appState.candidates[responseId].stage = stage;
   saveState();
   renderDashboardStats();
+}
+
+function deleteCandidate(responseId) {
+  if (!responseId) return;
+  const c = appState.candidates[responseId];
+  const name = c ? `${c.firstName} ${c.lastName}` : responseId;
+  if (!confirm(`Delete ${name}? This cannot be undone.`)) return;
+  delete appState.candidates[responseId];
+  saveState();
+  renderDashboardStats();
+  closeModal();
+  toast(`${name} deleted`, 'info');
 }
 
 function closeModal() {
