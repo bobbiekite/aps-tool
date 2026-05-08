@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PSC · APS Initial Appointment</title>
+<title>PSC · APS Initial Appointment v2</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -955,7 +955,7 @@ function handleCSV(input) {
     // Apply hardcoded mapping — no manual mapping needed
     appState.columnMapping = { ...HARDCODED_MAPPING };
     saveState();
-    const count = appState.csvData.length - 1;
+    const count = rows.length - 3; // exact count: total rows minus 3 header rows
     document.getElementById('batch-count').textContent = `${count} candidates`;
     document.getElementById('batch-controls').style.display = 'block';
     document.getElementById('mapping-section').style.display = 'none';
