@@ -456,10 +456,10 @@ tr.row:hover td { background: #FAFAF4; cursor: pointer; }
 <div class="toasts" id="toasts"></div>
 
 <script>
-// ══════════════════════════════════════
+// ----------------------------------------
 // EXACT COLUMN MAPPING — verified against actual Qualtrics CSV
 // Header name → column index
-// ══════════════════════════════════════
+// ----------------------------------------
 const COL = {
   responseId: 'ResponseId',        // col 8
   firstName:  'RecipientFirstName',// col 10
@@ -512,10 +512,10 @@ function getCol(row, key) {
   return (row[idx] || '').trim();
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // STATE — no localStorage, all in memory
 // Persisted via explicit export/import JSON
-// ══════════════════════════════════════
+// ----------------------------------------
 let S = {
   candidates: {},   // responseId → candidate object
   settings: {
@@ -535,9 +535,9 @@ let S = {
   batchStop: false,
 };
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // SETTINGS — use sessionStorage only for API key convenience
-// ══════════════════════════════════════
+// ----------------------------------------
 function saveSetting(key, val) {
   S.settings[key] = val;
   // Save settings (not candidate data) to localStorage for convenience
@@ -560,9 +560,9 @@ function loadSettings() {
   if (s.fullIv) document.getElementById('full-iv').value = s.fullIv;
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // NAVIGATION
-// ══════════════════════════════════════
+// ----------------------------------------
 function nav(name) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
@@ -572,9 +572,9 @@ function nav(name) {
   if (name === 'ops') renderOps();
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // TOAST
-// ══════════════════════════════════════
+// ----------------------------------------
 function toast(msg, type='') {
   const el = document.createElement('div');
   el.className = `toast ${type}`;
@@ -583,9 +583,9 @@ function toast(msg, type='') {
   setTimeout(() => el.remove(), 3500);
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // CSV LOADING
-// ══════════════════════════════════════
+// ----------------------------------------
 function loadCSV(input) {
   const file = input.files[0];
   if (!file) return;
@@ -654,9 +654,9 @@ function updateCVMatch() {
   document.getElementById('cv-match').textContent = matched;
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // CSV PARSER
-// ══════════════════════════════════════
+// ----------------------------------------
 function parseCSV(text) {
   const rows = [];
   const lines = text.split('\n');
@@ -685,9 +685,9 @@ function parseCSVLine(line) {
   return cells;
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // BATCH PROCESSING
-// ══════════════════════════════════════
+// ----------------------------------------
 async function runBatch(oneOnly) {
   if (!S.csvRows.length) { toast('Upload a CSV first', 'err'); return; }
   if (!S.settings.apiKey) { toast('Set API key in Settings first', 'err'); nav('settings'); return; }
@@ -820,9 +820,9 @@ function buildSurveyText(s) {
   ].filter(Boolean).join('\n\n');
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // PDF READING
-// ══════════════════════════════════════
+// ----------------------------------------
 async function readPDF(file) {
   return new Promise((res, rej) => {
     const reader = new FileReader();
@@ -832,9 +832,9 @@ async function readPDF(file) {
   });
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // CLAUDE API CALL
-// ══════════════════════════════════════
+// ----------------------------------------
 async function callAI(firstName, lastName, surveyText, cvData) {
   const system = `You are an expert faculty affairs analyst for the College of Professional Studies (PSC) at the University of Denver, conducting initial APS appointment assessments.
 
@@ -900,9 +900,9 @@ interviewQuestions must be null for Assistant rank. For Associate/Full, generate
   }
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // API TEST
-// ══════════════════════════════════════
+// ----------------------------------------
 async function testKey() {
   const key = document.getElementById('api-key').value;
   if (!key) { toast('Enter an API key first', 'err'); return; }
@@ -919,9 +919,9 @@ async function testKey() {
   } catch(e) { el.textContent = '✗ Network error'; el.style.color = 'var(--crimson)'; }
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // DASHBOARD
-// ══════════════════════════════════════
+// ----------------------------------------
 function renderStats() {
   const cs = Object.values(S.candidates);
   const total     = cs.length;
@@ -990,9 +990,9 @@ function renderTable() {
   </table>`;
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // INDIVIDUAL RECORD
-// ══════════════════════════════════════
+// ----------------------------------------
 function openRec(rid) {
   const c = S.candidates[rid];
   if (!c) return;
@@ -1195,9 +1195,9 @@ function buildRecBody(c) {
   return h;
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // INTERVIEW GUIDE
-// ══════════════════════════════════════
+// ----------------------------------------
 function openIvGuide() {
   const c = S.candidates[S.currentId];
   if (!c?.ai?.interviewQuestions?.length) return;
@@ -1222,9 +1222,9 @@ function openIvGuide() {
   document.getElementById('iv-overlay').classList.add('open');
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // OPERATIONS
-// ══════════════════════════════════════
+// ----------------------------------------
 function renderOps() {
   const cs = Object.values(S.candidates);
   const toIv   = cs.filter(c => c.stage === 'interview');
@@ -1270,9 +1270,9 @@ function markDone(rid) {
   if (S.candidates[rid]) { S.candidates[rid].stage = 'complete'; renderOps(); renderStats(); toast('Marked complete', 'ok'); }
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // EXPORT / IMPORT
-// ══════════════════════════════════════
+// ----------------------------------------
 function exportData() {
   const data = { version: 1, candidates: S.candidates, exported: new Date().toISOString() };
   dl(JSON.stringify(data, null, 2), `APS_Data_${new Date().toISOString().split('T')[0]}.json`, 'application/json');
@@ -1321,9 +1321,9 @@ function dl(content, name, type) {
   a.click();
 }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // PROGRESS HELPERS
-// ══════════════════════════════════════
+// ----------------------------------------
 function logLine(msg, cls='') {
   const log = document.getElementById('prog-log');
   const el = document.createElement('div');
@@ -1340,9 +1340,9 @@ function setProgress(done, total) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // DRAG & DROP
-// ══════════════════════════════════════
+// ----------------------------------------
 ['csv-zone','cv-zone'].forEach(id => {
   const el = document.getElementById(id);
   el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag'); });
@@ -1360,9 +1360,9 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   });
 });
 
-// ══════════════════════════════════════
+// ----------------------------------------
 // INIT
-// ══════════════════════════════════════
+// ----------------------------------------
 loadSettings();
 renderStats();
 renderTable();
