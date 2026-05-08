@@ -955,7 +955,7 @@ function handleCSV(input) {
     // Apply hardcoded mapping — no manual mapping needed
     appState.columnMapping = { ...HARDCODED_MAPPING };
     saveState();
-    const count = rows.length - 3; // exact count: total rows minus 3 header rows
+    const count = rows.slice(3).filter(r => r[8] && r[8].startsWith('R_')).length;
     document.getElementById('batch-count').textContent = `${count} candidates`;
     document.getElementById('batch-controls').style.display = 'block';
     document.getElementById('mapping-section').style.display = 'none';
@@ -1159,14 +1159,15 @@ async function runBatch() {
   document.getElementById('stop-batch-btn').style.display = 'inline-flex';
   document.getElementById('progress-container').style.display = 'block';
 
-  const rows = appState.csvData.slice(1); // skip header
+  const rows = appState.csvData.slice(1); // skip the kept header row
   let processed = 0;
 
   for (let i = 0; i < rows.length; i++) {
     if (appState.batchStop) break;
     const row = rows[i];
     const responseId = getField(row, 'responseId');
-    if (!responseId) continue;
+    // Skip any row that isn't a real Qualtrics response ID
+    if (!responseId || !responseId.startsWith('R_')) continue;
 
     // Skip already processed
     if (appState.candidates[responseId]?.aiAssessment) {
@@ -1211,7 +1212,7 @@ async function runSingle() {
   const rows = appState.csvData.slice(1);
   for (const row of rows) {
     const responseId = getField(row, 'responseId');
-    if (!responseId) continue;
+    if (!responseId || !responseId.startsWith('R_')) continue;
     if (!appState.candidates[responseId]?.aiAssessment) {
       document.getElementById('progress-container').style.display = 'block';
       const name = `${getField(row,'firstName')} ${getField(row,'lastName')}`.trim();
