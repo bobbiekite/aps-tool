@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSC APS - Appointment Review</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+  --crimson: #8B1A2B;
+  --crimson-hover: #a31f33;
+  --crimson-bg: #fdf5f6;
+  --ink: #1a1a1a;
+  --ink-mid: #555;
+  --ink-faint: #999;
+  --rule: #e8e8e6;
+  --surface: #ffffff;
+  --bg: #f4f3f1;
+  --green: #276b43;
+  --green-bg: #edf7f2;
+  --amber: #996600;
+  --amber-bg: #fef8e7;
+  --blue: #1a4d7a;
+  --blue-bg: #eef4fb;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; font-size: 14px; }
+
+header { background: var(--crimson); padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+.hdr-mark { font-family: 'DM Serif Display', serif; color: white; font-size: 22px; }
+.hdr-div { width: 1px; height: 20px; background: rgba(255,255,255,0.25); }
+.hdr-sub { color: rgba(255,255,255,0.65); font-size: 13px; }
+
+main { max-width: 1080px; margin: 0 auto; padding: 28px 24px 60px; }
+
+.step-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); margin-bottom: 12px; }
+
+.upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+
+.upload-zone { background: var(--surface); border: 2px dashed #d0cfc9; border-radius: 10px; padding: 26px 22px; cursor: pointer; transition: border-color 0.18s, background 0.18s; position: relative; user-select: none; }
+.upload-zone:hover { border-color: var(--crimson); background: var(--crimson-bg); }
+.upload-zone.loaded { border-style: solid; border-color: var(--green); background: var(--green-bg); }
+.upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-zone.loaded input[type=file] { pointer-events: none; }
+
+.uz-icon { font-size: 26px; margin-bottom: 8px; }
+.uz-title { font-weight: 600; font-size: 15px; margin-bottom: 3px; }
+.uz-hint { font-size: 12px; color: var(--ink-faint); }
+.uz-status { display: none; font-size: 12px; font-weight: 600; color: var(--green); margin-top: 8px; }
+.upload-zone.loaded .uz-status { display: block; }
+.upload-zone.loaded .uz-hint { display: none; }
+
+.btn-clear { display: none; position: absolute; top: 10px; right: 10px; background: none; border: 1px solid rgba(0,0,0,0.15); border-radius: 5px; padding: 2px 8px; font-size: 11px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--ink-mid); z-index: 2; }
+.btn-clear:hover { background: rgba(0,0,0,0.06); }
+.upload-zone.loaded .btn-clear { display: block; }
+
+.action-row { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.btn-build { background: var(--crimson); color: white; border: none; padding: 10px 22px; border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; opacity: 0.35; pointer-events: none; transition: background 0.15s; }
+.btn-build.ready { opacity: 1; pointer-events: auto; }
+.btn-build.ready:hover { background: var(--crimson-hover); }
+.action-note { font-size: 12px; color: var(--ink-faint); }
+
+.error-msg { display: none; background: #fff0f1; border: 1px solid #f0c0c5; border-radius: 7px; padding: 11px 15px; font-size: 13px; color: var(--crimson); margin-bottom: 16px; }
+.error-msg.show { display: block; }
+
+.stats-row { display: none; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+.stats-row.show { display: flex; }
+.stat { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 16px; min-width: 100px; }
+.stat .n { font-size: 22px; font-weight: 600; line-height: 1; margin-bottom: 2px; }
+.stat .l { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat.green .n { color: var(--green); }
+.stat.amber .n { color: var(--amber); }
+.stat.blue .n { color: var(--blue); }
+
+.table-card { display: none; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow-x: auto; }
+.table-card.show { display: block; }
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
+thead { background: #f0efed; }
+th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); white-space: nowrap; }
+td { padding: 11px 14px; border-top: 1px solid var(--rule); vertical-align: middle; }
+tbody tr:hover > td { background: #faf9f7; }
+
+.td-name { font-weight: 600; font-size: 14px; }
+.td-email { color: var(--ink-mid); font-size: 12px; margin-top: 1px; }
+.td-date { color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
+.td-id { font-family: monospace; font-size: 11px; color: var(--ink-faint); }
+
+.badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.b-green { background: var(--green-bg); color: var(--green); }
+.b-amber { background: var(--amber-bg); color: var(--amber); }
+.b-grey { background: #f0f0ee; color: var(--ink-faint); }
+.b-blue { background: var(--blue-bg); color: var(--blue); }
+
+.btn-expand { background: none; border: 1px solid var(--rule); border-radius: 5px; padding: 4px 10px; font-size: 11px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--ink-mid); transition: all 0.12s; white-space: nowrap; }
+.btn-expand:hover { border-color: var(--crimson); color: var(--crimson); }
+.btn-expand.open { background: var(--crimson-bg); border-color: var(--crimson); color: var(--crimson); }
+
+.detail-tr { display: none; }
+.detail-tr.open { display: table-row; }
+.detail-tr td { background: #f9f8f6; padding: 18px 20px 22px; border-top: 1px solid #ddd; }
+
+.detail-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--crimson); margin: 0 0 10px; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.q-block { background: white; border: 1px solid var(--rule); border-radius: 7px; padding: 11px 13px; }
+.q-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); margin-bottom: 5px; }
+.q-answer { font-size: 13px; color: var(--ink-mid); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.q-answer.empty { color: #bbb; font-style: italic; }
+
+.cv-link-row { margin-bottom: 14px; }
+.cv-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--green); text-decoration: none; padding: 5px 11px; background: var(--green-bg); border-radius: 5px; border: 1px solid #b8dfc9; }
+.cv-link:hover { background: #d8f0e4; }
+
+/* WARNINGS PANEL */
+.warn-panel { display: none; border: 1px solid #f0c896; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+.warn-panel.show { display: block; }
+.warn-header { background: var(--amber-bg); padding: 11px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.warn-header-left { display: flex; align-items: center; gap: 10px; }
+.warn-icon { font-size: 15px; }
+.warn-title { font-size: 13px; font-weight: 600; color: var(--amber); }
+.warn-count { font-size: 11px; background: #f0c060; color: #5a3a00; border-radius: 20px; padding: 1px 8px; font-weight: 600; }
+.warn-toggle { font-size: 11px; color: var(--amber); font-weight: 600; }
+.warn-body { display: none; background: white; }
+.warn-body.open { display: block; }
+.warn-section { padding: 14px 16px; border-top: 1px solid #f0ddb0; }
+.warn-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 10px; }
+.warn-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.warn-list li { font-size: 13px; color: var(--ink-mid); padding: 7px 10px; background: var(--amber-bg); border-radius: 5px; border-left: 3px solid #e0a030; }
+.warn-list li strong { color: var(--ink); }
+.warn-list li .rid { font-family: monospace; font-size: 11px; color: var(--ink-faint); display: block; margin-top: 2px; }
+
+/* REVIEW OVERLAY */
+.overlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(20,10,10,0.55); }
+.overlay.open { display: flex; flex-direction: column; }
+
+.overlay-header {
+  background: var(--crimson);
+  padding: 13px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.overlay-name { font-family: 'DM Serif Display', serif; color: white; font-size: 18px; flex: 1; }
+.overlay-meta { color: rgba(255,255,255,0.65); font-size: 12px; }
+.btn-print {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-print:hover { background: rgba(255,255,255,0.25); }
+.btn-close-overlay {
+  background: none;
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-close-overlay:hover { color: white; border-color: rgba(255,255,255,0.6); }
+
+/* LEFT PANEL - survey */
+.panel-survey {
+  overflow-y: auto;
+  padding: 20px;
+  border-right: 1px solid var(--rule);
+  background: #f4f3f1;
+}
+.panel-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+.ov-q-block {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 11px 13px;
+  margin-bottom: 10px;
+}
+.ov-q-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--crimson);
+  margin-bottom: 5px;
+}
+.ov-q-answer { font-size: 13px; color: var(--ink-mid); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.ov-q-answer.empty { color: #bbb; font-style: italic; }
+
+/* RIGHT PANEL - CV */
+.panel-cv {
+  display: flex;
+  flex-direction: column;
+  background: #555;
+  overflow: hidden;
+}
+.panel-cv iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+  height: 100%;
+}
+.panel-cv-nocv {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.5);
+  gap: 10px;
+  font-size: 14px;
+}
+.panel-cv-nocv .nocv-icon { font-size: 36px; opacity: 0.4; }
+
+/* OVERLAY TABS */
+.overlay-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  background: #6b1221;
+  flex-shrink: 0;
+}
+.ov-tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.ov-tab:hover { color: rgba(255,255,255,0.85); }
+.ov-tab.active { color: white; border-bottom-color: white; }
+
+.overlay-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1;
+  overflow: hidden;
+  background: #f4f3f1;
+}
+
+/* AI ASSESSMENT PANEL */
+.panel-ai {
+  display: none;
+  overflow-y: auto;
+  padding: 20px;
+  background: #f4f3f1;
+  grid-column: 1 / -1;
+}
+.panel-ai.active { display: block; }
+.panel-survey.active { display: block; }
+.panel-cv.active { display: flex; }
+.panel-survey, .panel-cv { display: none; }
+
+/* Default show both survey+cv when no AI tab active */
+.overlay-body.view-both .panel-survey { display: block; }
+.overlay-body.view-both .panel-cv { display: flex; }
+.overlay-body.view-ai .panel-ai { display: block; }
+
+/* AI loading state */
+.ai-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+  color: var(--ink-faint);
+}
+.ai-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--rule);
+  border-top-color: var(--crimson);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ai-loading-msg { font-size: 13px; font-style: italic; }
+
+/* AI result layout */
+.ai-rec-banner {
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.ai-rec-banner.assistant { background: #eef4fb; border: 1px solid #b8d0e8; }
+.ai-rec-banner.associate { background: var(--amber-bg); border: 1px solid #e8c878; }
+.ai-rec-banner.full { background: var(--green-bg); border: 1px solid #a8d8b8; }
+.ai-rec-rank {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  line-height: 1;
+}
+.ai-rec-banner.assistant .ai-rec-rank { color: var(--blue); }
+.ai-rec-banner.associate .ai-rec-rank { color: var(--amber); }
+.ai-rec-banner.full .ai-rec-rank { color: var(--green); }
+.ai-rec-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 3px; }
+.ai-rec-summary { font-size: 13px; color: var(--ink-mid); line-height: 1.55; }
+.ai-confidence {
+  margin-left: auto;
+  text-align: center;
+  flex-shrink: 0;
+}
+.ai-confidence .conf-n { font-size: 28px; font-weight: 600; line-height: 1; }
+.ai-confidence .conf-l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-faint); }
+.ai-rec-banner.assistant .conf-n { color: var(--blue); }
+.ai-rec-banner.associate .conf-n { color: var(--amber); }
+.ai-rec-banner.full .conf-n { color: var(--green); }
+
+/* Pillar scores */
+.ai-pillars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.pillar-card {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 14px;
+}
+.pillar-name { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 6px; }
+.pillar-weight { font-size: 10px; color: var(--ink-faint); margin-bottom: 10px; }
+.pillar-score-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+.pillar-score { font-size: 26px; font-weight: 600; color: var(--ink); line-height: 1; }
+.pillar-max { font-size: 13px; color: var(--ink-faint); }
+.pillar-bar-bg { background: var(--rule); border-radius: 3px; height: 5px; margin-bottom: 10px; }
+.pillar-bar-fill { height: 5px; border-radius: 3px; background: var(--crimson); transition: width 0.5s; }
+.pillar-notes { font-size: 12px; color: var(--ink-mid); line-height: 1.5; }
+
+/* Rubric criteria detail */
+.ai-section-title {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--crimson); margin: 0 0 10px;
+}
+.ai-criteria-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.crit-block {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 11px 13px;
+}
+.crit-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.crit-name { font-size: 11px; font-weight: 600; color: var(--ink); }
+.crit-score-badge {
+  font-size: 10px; font-weight: 700;
+  padding: 1px 7px; border-radius: 10px;
+  flex-shrink: 0; margin-left: 8px;
+}
+.cs-4 { background: var(--green-bg); color: var(--green); }
+.cs-3 { background: #eef4fb; color: var(--blue); }
+.cs-2 { background: var(--amber-bg); color: var(--amber); }
+.cs-1 { background: #fff0f1; color: var(--crimson); }
+.cs-na { background: #f0f0ee; color: var(--ink-faint); }
+.crit-rationale { font-size: 12px; color: var(--ink-mid); line-height: 1.5; }
+
+/* Flags */
+.ai-flags { margin-bottom: 20px; }
+.flag-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--amber-bg); border: 1px solid #e8c878;
+  border-radius: 7px; padding: 10px 13px; margin-bottom: 8px;
+  font-size: 13px; color: var(--ink-mid);
+}
+.flag-icon { flex-shrink: 0; font-size: 14px; }
+
+.ai-disclaimer {
+  font-size: 11px; color: var(--ink-faint); font-style: italic;
+  padding: 12px 14px; background: white; border: 1px solid var(--rule);
+  border-radius: 7px; line-height: 1.55;
+}
+
+/* Run assessment button */
+.btn-run-ai {
+  background: var(--crimson);
+  color: white;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-run-ai:hover { background: var(--crimson-hover); }
+.btn-run-ai:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* BATCH RUN */
+.batch-bar {
+  display: none;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.batch-bar.show { display: flex; }
+.btn-batch {
+  background: var(--ink);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.btn-batch:hover { background: #333; }
+.btn-batch:disabled { opacity: 0.45; cursor: not-allowed; }
+.batch-progress-wrap { flex: 1; min-width: 180px; }
+.batch-progress-label { font-size: 12px; color: var(--ink-mid); margin-bottom: 6px; }
+.batch-progress-bg { background: var(--rule); border-radius: 4px; height: 6px; }
+.batch-progress-fill { height: 6px; border-radius: 4px; background: var(--crimson); transition: width 0.3s; width: 0%; }
+.batch-summary { font-size: 12px; color: var(--ink-faint); flex-shrink: 0; }
+
+/* SETTINGS PANEL */
+.settings-panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.settings-label { font-size: 12px; font-weight: 600; color: var(--ink-mid); white-space: nowrap; }
+.settings-key-wrap { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 260px; }
+.settings-key-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fafaf9;
+  letter-spacing: 0.05em;
+}
+.settings-key-input:focus { outline: none; border-color: var(--crimson); }
+.btn-save-key {
+  background: var(--crimson);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-save-key:hover { background: var(--crimson-hover); }
+.key-status { font-size: 12px; white-space: nowrap; }
+.key-status.set { color: var(--green); font-weight: 600; }
+.key-status.unset { color: var(--ink-faint); }
+@media print {
+  body > header, main { display: none !important; }
+  .overlay { display: block !important; position: static !important; background: none !important; }
+  .overlay-header { background: var(--crimson) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .btn-print, .btn-close-overlay, .btn-run-ai, .overlay-tabs { display: none !important; }
+  .overlay-body { display: block !important; }
+  .panel-survey { display: block !important; overflow: visible !important; border: none !important; padding: 0 !important; }
+  .panel-cv, .panel-ai { display: none !important; }
+  .ov-q-block { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-mark">PSC</div>
+  <div class="hdr-div"></div>
+  <div class="hdr-sub">Adjunct Professorial Series &mdash; Appointment Review</div>
+</header>
+
+<main>
+
+  <div class="upload-grid">
+    <div class="upload-zone" id="csvZone">
+      <button class="btn-clear" id="csvClear">x Clear</button>
+      <input type="file" id="csvFile" accept=".csv">
+      <div class="uz-icon">&#128196;</div>
+      <div class="uz-title">Survey Responses (CSV)</div>
+      <div class="uz-hint">Qualtrics export &mdash; .csv file</div>
+      <div class="uz-status" id="csvStatus"></div>
+    </div>
+
+    <div class="upload-zone" id="cvZone">
+      <button class="btn-clear" id="cvClear">x Clear</button>
+      <input type="file" id="cvFiles" accept=".pdf" multiple>
+      <div class="uz-icon">&#128203;</div>
+      <div class="uz-title">CV Files (PDF)</div>
+      <div class="uz-hint">One or more PDFs named R_ResponseId_...</div>
+      <div class="uz-status" id="cvStatus"></div>
+    </div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn-build" id="buildBtn">Build Roster</button>
+    <span class="action-note" id="actionNote">Upload the CSV to continue</span>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- MISMATCH WARNINGS -->
+  <div class="warn-panel" id="warnPanel">
+    <div class="warn-header" onclick="toggleWarnings()">
+      <div class="warn-header-left">
+        <span class="warn-icon">&#9888;</span>
+        <span class="warn-title">Mismatch Warnings</span>
+        <span class="warn-count" id="warnCount">0</span>
+      </div>
+      <span class="warn-toggle" id="warnToggle">Show details</span>
+    </div>
+    <div class="warn-body" id="warnBody">
+      <div class="warn-section" id="noCVSection" style="display:none">
+        <div class="warn-section-title">Respondents with no CV uploaded</div>
+        <ul class="warn-list" id="noCVList"></ul>
+      </div>
+      <div class="warn-section" id="noRowSection" style="display:none">
+        <div class="warn-section-title">CV files with no matching survey response</div>
+        <ul class="warn-list" id="noRowList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-row" id="statsRow">
+    <div class="stat green"><div class="n" id="sTotal">0</div><div class="l">Respondents</div></div>
+    <div class="stat blue"><div class="n" id="sCV">0</div><div class="l">CVs Matched</div></div>
+    <div class="stat amber"><div class="n" id="sNoCV">0</div><div class="l">No CV</div></div>
+    <div class="stat amber"><div class="n" id="sPartial">0</div><div class="l">Incomplete</div></div>
+  </div>
+
+  <!-- BATCH RUN BAR -->
+  <div class="batch-bar" id="batchBar">
+    <button class="btn-batch" id="batchBtn" onclick="runBatchAssessments()">Run All AI Assessments</button>
+    <div class="batch-progress-wrap">
+      <div class="batch-progress-label" id="batchLabel">Ready to run assessments for all candidates</div>
+      <div class="batch-progress-bg"><div class="batch-progress-fill" id="batchFill"></div></div>
+    </div>
+    <div class="batch-summary" id="batchSummary"></div>
+  </div>
+
+  <div class="table-card" id="tableCard">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>DU Email</th>
+          <th>Submitted</th>
+          <th>Complete</th>
+          <th>Industry Active</th>
+          <th>CV</th>
+          <th>Response ID</th>
+          <th>AI Rec</th>
+          <th style="min-width:140px"></th>
+        </tr>
+      </thead>
+      <tbody id="rosterBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- REVIEW OVERLAY -->
+<div class="overlay" id="reviewOverlay">
+  <div class="overlay-header">
+    <div class="overlay-name" id="ovName"></div>
+    <div class="overlay-meta" id="ovMeta"></div>
+    <button class="btn-print" onclick="window.print()">Print Survey</button>
+    <button class="btn-close-overlay" onclick="closeReview()">Close</button>
+  </div>
+  <div class="overlay-tabs">
+    <div class="ov-tab active" id="tab-both" onclick="switchTab('both')">Survey + CV</div>
+    <div class="ov-tab" id="tab-ai" onclick="switchTab('ai')">AI Assessment</div>
+  </div>
+  <div class="overlay-body view-both" id="overlayBody">
+    <div class="panel-survey" id="ovSurvey">
+      <div class="panel-title">Survey Responses</div>
+    </div>
+    <div class="panel-cv" id="ovCV"></div>
+    <div class="panel-ai" id="ovAI"></div>
+  </div>
+</div>
+
+<script>
+// All state in memory only - no localStorage
+var S = {
+  rows: [],
+  cvMap: {},
+  labels: {},
+  currentReviewIdx: null,
+  apiKey: ''
+};
+
+function saveKey() {
+  var val = document.getElementById('apiKeyInput').value.trim();
+  if (!val) return;
+  S.apiKey = val;
+  document.getElementById('apiKeyInput').value = '';
+  document.getElementById('keyStatus').textContent = 'Key set \u2014 ready for AI assessments';
+  document.getElementById('keyStatus').className = 'key-status set';
+}
+
+// Survey question columns to display in detail view
+// key = Qualtrics machine key from row 1 of CSV
+var QCOLS = [
+  { k: 'Q5',  f: 'Industry Active' },
+  { k: 'Q6',  f: 'Industry - Other' },
+  { k: 'Q9',  f: 'Q2.1 Teaching Engagement' },
+  { k: 'Q10', f: 'Q2.2 Course Materials' },
+  { k: 'Q12', f: 'Q2.3 Professional Experience in Class' },
+  { k: 'Q13', f: 'Q2.4 Curriculum Development' },
+  { k: 'Q14', f: 'Q2.5 Student Mentoring' },
+  { k: 'Q15', f: 'Q2.6 Peer Observations' },
+  { k: 'Q16', f: 'Q2.6a Observation Outcome' },
+  { k: 'Q17', f: 'Q2.7 Teaching Growth' },
+  { k: 'Q19', f: 'Q3.1 Committees / Governance' },
+  { k: 'Q20', f: 'Q3.2 Network Value for Students' },
+  { k: 'Q21', f: 'Q3.3 Student Recruitment' },
+  { k: 'Q22', f: 'Q3.4 Professional / Public Service' },
+  { k: 'Q23', f: 'Q3.5 Current Professional Role' },
+  { k: 'Q26', f: 'Q4.1 Presentations / Publications' },
+  { k: 'Q27', f: 'Q4.2 Research / Applied Work' },
+  { k: 'Q28', f: 'Q4.3 Grants' },
+  { k: 'Q30', f: 'Q5.1 Most Proud Of' },
+  { k: 'Q31', f: 'Q5.2 Hardest Parts' },
+  { k: 'Q32', f: 'Q5.3 How PSC Can Support' },
+  { k: 'Q33', f: 'Q5.4 Goals Next Two Quarters' },
+  { k: 'Q35', f: 'Q5.6 Anything Else' }
+];
+
+// Wire up events after DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('csvFile').addEventListener('change', onCSV);
+  document.getElementById('cvFiles').addEventListener('change', onCVs);
+  document.getElementById('buildBtn').addEventListener('click', buildRoster);
+  document.getElementById('apiKeyInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') saveKey();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeReview();
+  });
+  document.getElementById('csvClear').addEventListener('click', function(e) {
+    e.stopPropagation();
+    S.rows = []; S.labels = {};
+    document.getElementById('csvZone').classList.remove('loaded');
+    document.getElementById('csvStatus').textContent = '';
+    document.getElementById('csvFile').value = '';
+    hideRoster(); updateUI();
+  });
+  document.getElementById('cvClear').addEventListener('click', function(e) {
+    e.stopPropagation();
+    S.cvMap = {};
+    document.getElementById('cvZone').classList.remove('loaded');
+    document.getElementById('cvStatus').textContent = '';
+    document.getElementById('cvFiles').value = '';
+    updateUI();
+  });
+});
+
+// Parse CSV text into array of arrays
+function parseCSV(text) {
+  var rows = [];
+  var row = [];
+  var cell = '';
+  var inQ = false;
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    if (ch === '"') {
+      if (inQ && text[i+1] === '"') { cell += '"'; i++; }
+      else { inQ = !inQ; }
+    } else if (ch === ',' && !inQ) {
+      row.push(cell); cell = '';
+    } else if ((ch === '\n' || ch === '\r') && !inQ) {
+      if (ch === '\r' && text[i+1] === '\n') i++;
+      row.push(cell); cell = '';
+      if (row.some(function(v){ return v.trim(); })) rows.push(row);
+      row = [];
+    } else {
+      cell += ch;
+    }
+  }
+  if (cell || row.length) { row.push(cell); if (row.some(function(v){ return v.trim(); })) rows.push(row); }
+  return rows;
+}
+
+function onCSV(evt) {
+  var file = evt.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var parsed = parseCSV(e.target.result);
+      // Qualtrics: row 0 = machine keys, row 1 = human labels, row 2 = import meta, row 3+ = data
+      if (parsed.length < 3) { showError('CSV has fewer than 3 rows - check the file.'); return; }
+
+      var keys = parsed[0];
+      var humanRow = parsed[1];
+
+      // Build label map
+      S.labels = {};
+      for (var i = 0; i < keys.length; i++) {
+        S.labels[keys[i]] = (humanRow[i] || keys[i]).replace(/\n[\s\S]*/g, '').trim();
+      }
+
+      // Parse respondent rows (start at index 3)
+      S.rows = [];
+      for (var r = 3; r < parsed.length; r++) {
+        var dataRow = parsed[r];
+        var obj = {};
+        for (var c = 0; c < keys.length; c++) {
+          obj[keys[c]] = (dataRow[c] || '').trim();
+        }
+        if (obj['ResponseId']) S.rows.push(obj);
+      }
+
+      document.getElementById('csvZone').classList.add('loaded');
+      document.getElementById('csvStatus').textContent =
+        S.rows.length + ' response' + (S.rows.length !== 1 ? 's' : '') + ' loaded';
+      hideError();
+      updateUI();
+    } catch(err) {
+      showError('Could not read CSV: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function onCVs(evt) {
+  var files = evt.target.files;
+  if (!files || !files.length) return;
+  S.cvMap = {};
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    // ResponseId = text before second underscore: R_xxxxxxx
+    var parts = f.name.split('_');
+    if (parts.length >= 2) {
+      var rid = parts[0] + '_' + parts[1];
+      S.cvMap[rid] = { name: f.name, url: URL.createObjectURL(f) };
+    }
+  }
+  var count = Object.keys(S.cvMap).length;
+  document.getElementById('cvZone').classList.add('loaded');
+  document.getElementById('cvStatus').textContent =
+    count + ' CV' + (count !== 1 ? 's' : '') + ' loaded (' + files.length + ' file' + (files.length !== 1 ? 's' : '') + ')';
+  updateUI();
+}
+
+function updateUI() {
+  var btn = document.getElementById('buildBtn');
+  var note = document.getElementById('actionNote');
+  var hasCsv = S.rows.length > 0;
+  var cvCount = Object.keys(S.cvMap).length;
+  if (hasCsv) {
+    btn.classList.add('ready');
+    note.textContent = S.rows.length + ' respondent' + (S.rows.length !== 1 ? 's' : '') +
+      (cvCount ? ', ' + cvCount + ' CV' + (cvCount !== 1 ? 's' : '') + ' loaded' : ' (no CVs yet)');
+  } else {
+    btn.classList.remove('ready');
+    note.textContent = 'Upload the CSV to continue';
+  }
+}
+
+function buildRoster() {
+  if (!S.rows.length) return;
+  hideError();
+
+  var total = S.rows.length;
+  var cvMatched = 0;
+  var noCV = 0;
+  var partial = 0;
+  var tbody = document.getElementById('rosterBody');
+  tbody.innerHTML = '';
+
+  S.rows.forEach(function(row, idx) {
+    var rid      = row['ResponseId'] || '';
+    var first    = row['RecipientFirstName'] || '';
+    var last     = row['RecipientLastName'] || '';
+    var email    = row['RecipientEmail'] || '';
+    var persEmail= row['Personal Email'] || '';
+    var recorded = row['RecordedDate'] || '';
+    var finished = row['Finished'] || '';
+    var progress = row['Progress'] || '0';
+    var industry = row['Q5'] || '';
+    var complete = (finished === 'True' || finished === '1' || finished === 'true');
+
+    if (!complete) partial++;
+
+    var cv = S.cvMap[rid] || null;
+    if (cv) cvMatched++; else noCV++;
+
+    var dateStr = '';
+    if (recorded) {
+      try { var d = new Date(recorded); dateStr = (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+      catch(e) { dateStr = recorded.substring(0, 10); }
+    }
+
+    var nameStr = (last && first) ? last + ', ' + first : (last || first || '(no name)');
+    var displayEmail = email || persEmail;
+
+    // Main row
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' +
+        '<div class="td-name">' + esc(nameStr) + '</div>' +
+        (displayEmail ? '<div class="td-email">' + esc(displayEmail) + '</div>' : '') +
+      '</td>' +
+      '<td class="td-email">' + esc(email) + '</td>' +
+      '<td class="td-date">' + esc(dateStr) + '</td>' +
+      '<td>' + (complete
+        ? '<span class="badge b-green">Complete</span>'
+        : '<span class="badge b-amber">Partial ' + esc(progress) + '%</span>') +
+      '</td>' +
+      '<td>' + (industry
+        ? '<span class="badge b-blue">' + esc(industry.length > 35 ? industry.substring(0,35)+'...' : industry) + '</span>'
+        : '<span class="badge b-grey">Not answered</span>') +
+      '</td>' +
+      '<td>' + (cv
+        ? '<span class="badge b-green">Uploaded</span>'
+        : '<span class="badge b-grey">None</span>') +
+      '</td>' +
+      '<td class="td-id">' + esc(rid) + '</td>' +
+      '<td id="airecbadge-' + idx + '"><span class="badge b-grey" style="font-size:10px">Not run</span></td>' +
+      '<td style="white-space:nowrap;min-width:140px">' +
+        '<button class="btn-expand" id="expbtn-' + idx + '" onclick="toggleDetail(' + idx + ')">View</button> ' +
+        '<button class="btn-expand" onclick="openReview(' + idx + ')" style="background:var(--crimson-bg);border-color:var(--crimson);color:var(--crimson)">Review</button>' +
+      '</td>';
+
+    tbody.appendChild(tr);
+
+    // Detail row
+    var dtr = document.createElement('tr');
+    dtr.className = 'detail-tr';
+    dtr.id = 'detail-' + idx;
+
+    var html = '<td colspan="9">';
+
+    if (cv) {
+      html += '<div class="cv-link-row"><a class="cv-link" href="' + esc(cv.url) + '" target="_blank">Open CV &mdash; ' + esc(cv.name) + '</a></div>';
+    }
+
+    html += '<div class="detail-section-title">Survey Responses</div><div class="detail-grid">';
+
+    QCOLS.forEach(function(q) {
+      var val = row[q.k] || '';
+      // Use human label from CSV if we have it, else fallback
+      var rawLabel = S.labels[q.k] || q.f;
+      // Trim to first line, max 80 chars
+      var label = rawLabel.split('\n')[0].trim();
+      if (label.length > 80) label = label.substring(0,80) + '...';
+
+      html += '<div class="q-block">' +
+        '<div class="q-label">' + esc(label) + '</div>' +
+        '<div class="q-answer' + (val ? '' : ' empty') + '">' + (val ? esc(val) : 'No response') + '</div>' +
+        '</div>';
+    });
+
+    html += '</div></td>';
+    dtr.innerHTML = html;
+    tbody.appendChild(dtr);
+  });
+
+  document.getElementById('sTotal').textContent = total;
+  document.getElementById('sCV').textContent = cvMatched;
+  document.getElementById('sNoCV').textContent = noCV;
+  document.getElementById('sPartial').textContent = partial;
+  document.getElementById('statsRow').classList.add('show');
+  document.getElementById('tableCard').classList.add('show');
+  document.getElementById('batchBar').classList.add('show');
+  document.getElementById('batchFill').style.width = '0%';
+  document.getElementById('batchLabel').textContent = 'Ready to run assessments for all ' + total + ' candidates';
+  document.getElementById('batchSummary').textContent = '';
+  document.getElementById('batchBtn').disabled = false;
+  document.getElementById('batchBtn').textContent = 'Run All AI Assessments';
+
+  // Build warnings panel
+  // Scenario A: CSV rows with no CV
+  var noCVItems = [];
+  S.rows.forEach(function(row) {
+    var rid = row['ResponseId'] || '';
+    if (!S.cvMap[rid]) {
+      var first = row['RecipientFirstName'] || '';
+      var last  = row['RecipientLastName']  || '';
+      var email = row['RecipientEmail'] || row['Personal Email'] || '';
+      var name  = (last && first) ? last + ', ' + first : (last || first || '(no name)');
+      noCVItems.push({ name: name, email: email, rid: rid });
+    }
+  });
+
+  // Scenario B: CV files with no CSV row
+  var csvRids = {};
+  S.rows.forEach(function(row) { if (row['ResponseId']) csvRids[row['ResponseId']] = true; });
+  var noRowItems = [];
+  Object.keys(S.cvMap).forEach(function(rid) {
+    if (!csvRids[rid]) {
+      noRowItems.push({ filename: S.cvMap[rid].name, rid: rid });
+    }
+  });
+
+  var totalWarnings = noCVItems.length + noRowItems.length;
+
+  if (totalWarnings > 0) {
+    document.getElementById('warnCount').textContent = totalWarnings;
+    document.getElementById('warnPanel').classList.add('show');
+
+    var noCVList = document.getElementById('noCVList');
+    var noCVSection = document.getElementById('noCVSection');
+    noCVList.innerHTML = '';
+    if (noCVItems.length > 0) {
+      noCVSection.style.display = 'block';
+      noCVItems.forEach(function(item) {
+        var li = document.createElement('li');
+        li.innerHTML = '<strong>' + esc(item.name) + '</strong>' +
+          (item.email ? ' &mdash; ' + esc(item.email) : '') +
+          '<span class="rid">' + esc(item.rid) + '</span>';
+        noCVList.appendChild(li);
+      });
+    } else {
+      noCVSection.style.display = 'none';
+    }
+
+    var noRowList = document.getElementById('noRowList');
+    var noRowSection = document.getElementById('noRowSection');
+    noRowList.innerHTML = '';
+    if (noRowItems.length > 0) {
+      noRowSection.style.display = 'block';
+      noRowItems.forEach(function(item) {
+        var li = document.createElement('li');
+        li.innerHTML = '<strong>' + esc(item.filename) + '</strong>' +
+          '<span class="rid">Extracted ID: ' + esc(item.rid) + '</span>';
+        noRowList.appendChild(li);
+      });
+    } else {
+      noRowSection.style.display = 'none';
+    }
+  } else {
+    document.getElementById('warnPanel').classList.remove('show');
+  }
+}
+
+function openReview(idx) {
+  var row = S.rows[idx];
+  if (!row) return;
+
+  S.currentReviewIdx = idx;
+
+  var first = row['RecipientFirstName'] || '';
+  var last  = row['RecipientLastName']  || '';
+  var email = row['RecipientEmail'] || row['Personal Email'] || '';
+  var recorded = row['RecordedDate'] || '';
+  var rid   = row['ResponseId'] || '';
+  var nameStr = (last && first) ? last + ', ' + first : (last || first || '(no name)');
+
+  var dateStr = '';
+  if (recorded) {
+    try { var d = new Date(recorded); dateStr = (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear(); } catch(e) {}
+  }
+
+  // Header
+  document.getElementById('ovName').textContent = nameStr;
+  document.getElementById('ovMeta').textContent =
+    (email ? email + '   ' : '') + (dateStr ? 'Submitted ' + dateStr : '') + '   ' + rid;
+
+  // Reset to Survey+CV tab
+  switchTab('both');
+
+  // Survey panel
+  var surveyEl = document.getElementById('ovSurvey');
+  surveyEl.innerHTML = '<div class="panel-title">Survey Responses</div>';
+  QCOLS.forEach(function(q) {
+    var val = row[q.k] || '';
+    var rawLabel = S.labels[q.k] || q.f;
+    var label = rawLabel.split('\n')[0].trim();
+    if (label.length > 80) label = label.substring(0, 80) + '...';
+    var block = document.createElement('div');
+    block.className = 'ov-q-block';
+    block.innerHTML =
+      '<div class="ov-q-label">' + esc(label) + '</div>' +
+      '<div class="ov-q-answer' + (val ? '' : ' empty') + '">' + (val ? esc(val) : 'No response') + '</div>';
+    surveyEl.appendChild(block);
+  });
+
+  // CV panel
+  var cvEl = document.getElementById('ovCV');
+  var cv = S.cvMap[rid] || null;
+  if (cv) {
+    cvEl.innerHTML = '<iframe src="' + cv.url + '" title="CV"></iframe>';
+  } else {
+    cvEl.innerHTML =
+      '<div class="panel-cv-nocv">' +
+        '<div class="nocv-icon">&#128203;</div>' +
+        '<div>No CV uploaded for this respondent</div>' +
+      '</div>';
+  }
+
+  // Clear AI panel so it re-runs fresh when tab is clicked
+  var aiEl = document.getElementById('ovAI');
+  aiEl.innerHTML = '';
+  aiEl.dataset.idx = '';
+
+  document.getElementById('reviewOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+// ── BATCH RUN ALL ASSESSMENTS ──
+function runBatchAssessments() {
+  if (!S.rows.length) return;
+
+  var btn = document.getElementById('batchBtn');
+  var label = document.getElementById('batchLabel');
+  var fill = document.getElementById('batchFill');
+  var summary = document.getElementById('batchSummary');
+
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+
+  var total = S.rows.length;
+  var completed = 0;
+  var counts = { assistant: 0, associate: 0, full: 0, error: 0 };
+
+  function updateProgress() {
+    var pct = Math.round((completed / total) * 100);
+    fill.style.width = pct + '%';
+    label.textContent = completed + ' of ' + total + ' assessed';
+    summary.textContent =
+      'Full: ' + counts.full +
+      '  Associate: ' + counts.associate +
+      '  Assistant: ' + counts.assistant +
+      (counts.error ? '  Errors: ' + counts.error : '');
+  }
+
+  // Process sequentially with a small gap to avoid rate limits
+  function processNext(idx) {
+    if (idx >= total) {
+      // All done
+      btn.disabled = false;
+      btn.textContent = 'Re-run All Assessments';
+      label.textContent = 'All ' + total + ' assessments complete';
+      return;
+    }
+
+    var row = S.rows[idx];
+    var prompt = buildPrompt(row);
+
+    // Mark roster badge as in-progress
+    var badgeEl = document.getElementById('airecbadge-' + idx);
+    if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px">...</span>';
+
+    fetch('https://dark-credit-4434.bobbie-kite.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      var text = '';
+      if (data.content && data.content.length) {
+        data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
+      }
+      text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
+      var result = JSON.parse(text);
+
+      // Store result so Review overlay can use it without re-running
+      S.rows[idx]._aiResult = result;
+
+      // Update roster badge
+      var rankKey = (result.recommendedRank || '').toLowerCase().indexOf('full') >= 0 ? 'full'
+        : (result.recommendedRank || '').toLowerCase().indexOf('associate') >= 0 ? 'associate'
+        : 'assistant';
+      counts[rankKey]++;
+
+      if (badgeEl) {
+        var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
+        var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
+        badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>';
+      }
+    })
+    .catch(function() {
+      counts.error++;
+      if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px;color:var(--crimson)">Error</span>';
+    })
+    .finally(function() {
+      completed++;
+      updateProgress();
+      // 300ms gap between calls to avoid rate limiting
+      setTimeout(function() { processNext(idx + 1); }, 300);
+    });
+  }
+
+  updateProgress();
+  processNext(0);
+}
+
+// ── TAB SWITCHING ──
+function switchTab(tab) {
+  var body = document.getElementById('overlayBody');
+  var tabBoth = document.getElementById('tab-both');
+  var tabAI = document.getElementById('tab-ai');
+
+  if (tab === 'both') {
+    body.className = 'overlay-body view-both';
+    tabBoth.classList.add('active');
+    tabAI.classList.remove('active');
+  } else {
+    body.className = 'overlay-body view-ai';
+    tabAI.classList.add('active');
+    tabBoth.classList.remove('active');
+    // Auto-run if not already run for this candidate
+    var aiEl = document.getElementById('ovAI');
+    if (aiEl.dataset.idx !== String(S.currentReviewIdx)) {
+      runAIAssessment(S.currentReviewIdx);
+    }
+  }
+}
+
+// ── BUILD ASSESSMENT PROMPT ──
+function buildPrompt(row) {
+  var name = ((row['RecipientFirstName'] || '') + ' ' + (row['RecipientLastName'] || '')).trim();
+
+  var surveyText = '';
+  QCOLS.forEach(function(q) {
+    var val = row[q.k] || '';
+    var label = (S.labels[q.k] || q.f).split('\n')[0].trim();
+    surveyText += label + ': ' + (val || 'No response') + '\n';
+  });
+
+  return 'You are an expert faculty evaluator for the University of Denver College of Professional Studies (PSC). ' +
+    'You are performing an initial rank assessment for the Adjunct Professorial Series (APS).\n\n' +
+
+    'THE THREE RANKS:\n' +
+    '- Adjunct Assistant Professor: Primary industry involvement, teaches and does light course maintenance. Score 4.5+ on student evals. 1 PD per cycle. Minor curriculum updates.\n' +
+    '- Adjunct Associate Professor: REQUIRES active industry engagement (employment, consulting, board with operational involvement, contract work, or publications). Score 5.0+. 2+ PD per cycle. Curriculum updates 15-20hrs. At least 1 experiential learning opportunity per cycle. At least 1 presentation/publication per cycle.\n' +
+    '- Adjunct Professor (Full): REQUIRES active industry engagement. Score 5.0+. Multiple PD. Curriculum leadership 25-30hrs. Broad active network. Leads curriculum committees. Multiple presentations/publications. Recognized research/grants.\n\n' +
+
+    'RUBRIC WEIGHTS: Teaching Excellence 70%, Service 20%, Scholarship 10%.\n\n' +
+
+    'RATING SCALE: 4=Exceeds Expectations, 3=Meets Expectations, 2=Needs Improvement, 1=Unsatisfactory, 0=N/A\n\n' +
+
+    'CANDIDATE: ' + name + '\n\n' +
+    'SURVEY RESPONSES:\n' + surveyText + '\n\n' +
+
+    'IMPORTANT: Associate and Full rank REQUIRE active industry engagement. If the candidate\'s industry status is unclear or they only have volunteer board service, flag this.\n\n' +
+
+    'Respond ONLY with a valid JSON object, no markdown, no preamble, exactly this structure:\n' +
+    '{\n' +
+    '  "recommendedRank": "Adjunct Assistant Professor" or "Adjunct Associate Professor" or "Adjunct Professor",\n' +
+    '  "confidence": <integer 1-100>,\n' +
+    '  "summary": "<2-3 sentence summary of recommendation reasoning>",\n' +
+    '  "pillars": {\n' +
+    '    "teaching": { "score": <1-4>, "notes": "<2-3 sentences>" },\n' +
+    '    "service": { "score": <1-4>, "notes": "<2-3 sentences>" },\n' +
+    '    "scholarship": { "score": <1-4 or 0 if NA>, "notes": "<2-3 sentences>" }\n' +
+    '  },\n' +
+    '  "criteria": [\n' +
+    '    { "name": "Connect with Students", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Course Presence & Participation", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Industry Expertise Integration", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Grading, Feedback & Ownership", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Professional Development", "pillar": "service", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Curriculum Contribution", "pillar": "service", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Industry Connections & Experiential Learning", "pillar": "service", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "College & Program Engagement", "pillar": "service", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Relevancy & Currency", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Presentations & Publications", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Research & Grant Activity", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<1-2 sentences>" }\n' +
+    '  ],\n' +
+    '  "flags": ["<any concerns about missing info, industry engagement ambiguity, or rubric gaps>"]\n' +
+    '}';
+}
+
+// ── RUN AI ASSESSMENT ──
+function runAIAssessment(idx) {
+  var row = S.rows[idx];
+  if (!row) return;
+
+  var aiEl = document.getElementById('ovAI');
+  aiEl.dataset.idx = idx;
+
+  // Use cached result from batch run if available
+  if (row._aiResult) {
+    renderAssessment(aiEl, row._aiResult, idx);
+    return;
+  }
+
+  // Show loading
+  aiEl.innerHTML =
+    '<div class="ai-loading">' +
+      '<div class="ai-spinner"></div>' +
+      '<div class="ai-loading-msg">Evaluating candidate against APS rubric...</div>' +
+    '</div>';
+
+  var prompt = buildPrompt(row);
+
+  fetch('https://dark-credit-4434.bobbie-kite.workers.dev', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    var text = '';
+    if (data.content && data.content.length) {
+      data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
+    }
+    text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
+    var result = JSON.parse(text);
+    row._aiResult = result;
+    renderAssessment(aiEl, result, idx);
+  })
+  .catch(function(err) {
+    aiEl.innerHTML =
+      '<div style="padding:30px;color:var(--crimson);font-size:13px">' +
+        '<strong>Assessment failed.</strong> ' + esc(String(err)) +
+        '<br><br><button class="btn-run-ai" onclick="runAIAssessment(' + idx + ')">Retry</button>' +
+      '</div>';
+  });
+}
+
+// ── RENDER ASSESSMENT RESULT ──
+function renderAssessment(el, r, idx) {
+  var rankKey = (r.recommendedRank || '').toLowerCase().indexOf('full') >= 0 ? 'full'
+    : (r.recommendedRank || '').toLowerCase().indexOf('associate') >= 0 ? 'associate'
+    : 'assistant';
+
+  var rankLabel = r.recommendedRank || 'Adjunct Assistant Professor';
+  var conf = r.confidence || 0;
+  var summary = r.summary || '';
+
+  // Write result back to roster badge
+  var badgeEl = document.getElementById('airecbadge-' + idx);
+  if (badgeEl) {
+    var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
+    var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
+    badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>';
+  }
+
+  var html = '';
+
+  // Recommendation banner
+  html += '<div class="ai-rec-banner ' + rankKey + '">' +
+    '<div>' +
+      '<div class="ai-rec-label">Preliminary Rank Recommendation</div>' +
+      '<div class="ai-rec-rank">' + esc(rankLabel) + '</div>' +
+      '<div class="ai-rec-summary" style="margin-top:8px">' + esc(summary) + '</div>' +
+    '</div>' +
+    '<div class="ai-confidence">' +
+      '<div class="conf-n">' + conf + '%</div>' +
+      '<div class="conf-l">Confidence</div>' +
+    '</div>' +
+  '</div>';
+
+  // Pillar scores
+  var pillars = r.pillars || {};
+  var pDefs = [
+    { key: 'teaching', label: 'Teaching Excellence', weight: '70%' },
+    { key: 'service', label: 'Service', weight: '20%' },
+    { key: 'scholarship', label: 'Scholarship', weight: '10%' }
+  ];
+
+  html += '<div class="ai-pillars">';
+  pDefs.forEach(function(p) {
+    var pd = pillars[p.key] || {};
+    var score = pd.score || 0;
+    var pct = score > 0 ? Math.round((score / 4) * 100) : 0;
+    html += '<div class="pillar-card">' +
+      '<div class="pillar-name">' + p.label + '</div>' +
+      '<div class="pillar-weight">Weight: ' + p.weight + '</div>' +
+      '<div class="pillar-score-row"><span class="pillar-score">' + (score || 'N/A') + '</span><span class="pillar-max">' + (score ? '/ 4' : '') + '</span></div>' +
+      '<div class="pillar-bar-bg"><div class="pillar-bar-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="pillar-notes">' + esc(pd.notes || '') + '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+
+  // Criteria detail
+  var criteria = r.criteria || [];
+  if (criteria.length) {
+    var byPillar = { teaching: [], service: [], scholarship: [] };
+    criteria.forEach(function(c) { if (byPillar[c.pillar]) byPillar[c.pillar].push(c); });
+
+    pDefs.forEach(function(p) {
+      var crits = byPillar[p.key];
+      if (!crits || !crits.length) return;
+      html += '<div class="ai-section-title">' + p.label + ' — Criteria Detail</div>';
+      html += '<div class="ai-criteria-grid">';
+      crits.forEach(function(c) {
+        var sc = c.score || 0;
+        var cls = sc === 4 ? 'cs-4' : sc === 3 ? 'cs-3' : sc === 2 ? 'cs-2' : sc === 1 ? 'cs-1' : 'cs-na';
+        var lbl = sc === 4 ? '4 — Exceeds' : sc === 3 ? '3 — Meets' : sc === 2 ? '2 — Needs Impr.' : sc === 1 ? '1 — Unsatisfactory' : 'N/A';
+        html += '<div class="crit-block">' +
+          '<div class="crit-header">' +
+            '<div class="crit-name">' + esc(c.name) + '</div>' +
+            '<div class="crit-score-badge ' + cls + '">' + lbl + '</div>' +
+          '</div>' +
+          '<div class="crit-rationale">' + esc(c.rationale || '') + '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+    });
+  }
+
+  // Flags
+  var flags = r.flags || [];
+  if (flags.length && flags[0]) {
+    html += '<div class="ai-section-title">Flags & Gaps</div><div class="ai-flags">';
+    flags.forEach(function(f) {
+      if (f) html += '<div class="flag-item"><span class="flag-icon">&#9888;</span><span>' + esc(f) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // Re-run button + disclaimer
+  html += '<button class="btn-run-ai" style="margin-bottom:14px" onclick="S.rows[' + idx + ']._aiResult=null;runAIAssessment(' + idx + ')">Re-run Assessment</button>';
+  html += '<div class="ai-disclaimer">This is a preliminary AI-assisted assessment based on survey responses only. ' +
+    'It does not replace human review, interviews, or the formal rubric evaluation. ' +
+    'Associate and Full rank candidates should proceed to interview before rank is confirmed. ' +
+    'The evaluator retains full authority over the final rank determination.</div>';
+
+  el.innerHTML = html;
+}
+
+function closeReview() {
+  document.getElementById('reviewOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+  document.getElementById('ovCV').innerHTML = '';
+  switchTab('both');
+}
+
+function toggleWarnings() {
+  var body = document.getElementById('warnBody');
+  var toggle = document.getElementById('warnToggle');
+  var open = body.classList.toggle('open');
+  toggle.textContent = open ? 'Hide details' : 'Show details';
+}
+
+function toggleDetail(idx) {
+  var dtr = document.getElementById('detail-' + idx);
+  var btn = document.getElementById('expbtn-' + idx);
+  var open = dtr.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  btn.textContent = open ? 'Close' : 'View';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showError(msg) { var e = document.getElementById('errorMsg'); e.textContent = msg; e.classList.add('show'); }
+function hideError() { document.getElementById('errorMsg').classList.remove('show'); }
+function hideRoster() {
+  document.getElementById('statsRow').classList.remove('show');
+  document.getElementById('tableCard').classList.remove('show');
+  document.getElementById('warnPanel').classList.remove('show');
+  document.getElementById('batchBar').classList.remove('show');
+  document.getElementById('rosterBody').innerHTML = '';
+}
+</script>
+</body>
+</html>
