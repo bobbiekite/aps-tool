@@ -548,6 +548,7 @@ tbody tr:hover > td { background: #faf9f7; }
   .ov-q-block { break-inside: avoid; }
 }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -583,7 +584,7 @@ tbody tr:hover > td { background: #faf9f7; }
       <input type="file" id="evalFile" accept=".csv,.xlsx">
       <div class="uz-icon">&#128200;</div>
       <div class="uz-title">Course Evaluations (CSV or XLSX)</div>
-      <div class="uz-hint">Static reference file — matched to respondents by DU ID</div>
+      <div class="uz-hint">Static reference file — matched to respondents by DU ID. XLSX or CSV.</div>
       <div class="uz-status" id="evalStatus"></div>
     </div>
   </div>
@@ -1183,6 +1184,7 @@ function runBatchAssessments() {
     })
     .then(function(res) { return res.json(); })
     .then(function(data) {
+      if (data.error) throw new Error('API: ' + (data.error.message || JSON.stringify(data.error)));
       var text = '';
       if (data.content && data.content.length) {
         data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
@@ -1221,34 +1223,49 @@ function runBatchAssessments() {
   processNext(0);
 }
 
-// ── LOAD EVAL FILE (CSV only - XLSX requires server-side) ──
+// ── LOAD EVAL FILE (CSV or XLSX via SheetJS) ──
 function onEvals(evt) {
   var file = evt.target.files[0];
   if (!file) return;
 
+  var isXlsx = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
   var reader = new FileReader();
+
   reader.onload = function(e) {
     try {
-      var parsed = parseCSV(e.target.result);
-      if (parsed.length < 2) { showError('Eval file appears empty.'); return; }
+      var rows = [];
 
-      var headers = parsed[0];
+      if (isXlsx) {
+        var data = new Uint8Array(e.target.result);
+        var workbook = XLSX.read(data, { type: 'array' });
+        var sheetName = workbook.SheetNames[0];
+        var sheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      } else {
+        var parsed = parseCSV(e.target.result);
+        if (parsed.length < 2) { showError('Eval file appears empty.'); return; }
+        var headers = parsed[0];
+        for (var r = 1; r < parsed.length; r++) {
+          var dataRow = parsed[r];
+          if (!dataRow || dataRow.length < 5) continue;
+          var obj = {};
+          for (var c = 0; c < headers.length; c++) {
+            obj[headers[c]] = (dataRow[c] || '').trim();
+          }
+          rows.push(obj);
+        }
+      }
+
       S.evalRows = [];
       S.evalByDUID = {};
 
-      for (var r = 1; r < parsed.length; r++) {
-        var dataRow = parsed[r];
-        if (!dataRow || dataRow.length < 5) continue;
-        var obj = {};
-        for (var c = 0; c < headers.length; c++) {
-          obj[headers[c]] = (dataRow[c] || '').trim();
-        }
-        var did = (obj['DU ID'] || '').trim();
-        if (!did) continue;
+      rows.forEach(function(obj) {
+        var did = String(obj['DU ID'] || '').trim();
+        if (!did) return;
         S.evalRows.push(obj);
         if (!S.evalByDUID[did]) S.evalByDUID[did] = [];
         S.evalByDUID[did].push(obj);
-      }
+      });
 
       var instructorCount = Object.keys(S.evalByDUID).length;
       document.getElementById('evalZone').classList.add('loaded');
@@ -1259,7 +1276,12 @@ function onEvals(evt) {
       showError('Could not read eval file: ' + err.message);
     }
   };
-  reader.readAsText(file);
+
+  if (isXlsx) {
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.readAsText(file);
+  }
 }
 
 // ── INSTRUCTOR QUESTIONS (eval file column names) ──
@@ -1358,12 +1380,21 @@ function buildEvalSummary(duid) {
 
   // Q22/Q23 comments from last two terms only
   var commentRows = rows.filter(function(r) { return lastTwoTerms.indexOf(r['_term']) >= 0; });
+  // Find Q22 and Q23 column names dynamically (handles curly vs straight apostrophes)
+  var q22col = '', q23col = '';
+  if (rows.length > 0) {
+    Object.keys(rows[0]).forEach(function(k) {
+      if (k.indexOf('Question 22') >= 0) q22col = k;
+      if (k.indexOf('Question 23') >= 0) q23col = k;
+    });
+  }
+
   var strengths = commentRows.map(function(r) {
-    return { term: termLabel(r['_term']), text: (r['Question 22 - Please highlight at least two strengths of the following: the course and instructor\'s teaching practice.'] || '').trim() };
+    return { term: termLabel(r['_term']), text: (r[q22col] || '').trim() };
   }).filter(function(c) { return c.text && c.text.length > 10; });
 
   var improvements = commentRows.map(function(r) {
-    return { term: termLabel(r['_term']), text: (r['Question 23 - What recommendations would you offer for improving the course and/or instructor\'s teaching practice?'] || '').trim() };
+    return { term: termLabel(r['_term']), text: (r[q23col] || '').trim() };
   }).filter(function(c) { return c.text && c.text.length > 10; });
 
   // Total respondents
@@ -1665,6 +1696,7 @@ function runAIAssessment(idx) {
   })
   .then(function(res) { return res.json(); })
   .then(function(data) {
+    if (data.error) throw new Error('API error: ' + (data.error.message || JSON.stringify(data.error)));
     var text = '';
     if (data.content && data.content.length) {
       data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
@@ -1677,8 +1709,8 @@ function runAIAssessment(idx) {
   .catch(function(err) {
     aiEl.innerHTML =
       '<div style="padding:30px;color:var(--crimson);font-size:13px">' +
-        '<strong>Assessment failed.</strong> ' + esc(String(err)) +
-        '<br><br><button class="btn-run-ai" onclick="runAIAssessment(' + idx + ')">Retry</button>' +
+        '<strong>Assessment failed.</strong><br><br>' + esc(String(err)) +
+        '<br><br><button class="btn-run-ai" onclick="S.rows[' + idx + ']._aiResult=null;runAIAssessment(' + idx + ')">Retry</button>' +
       '</div>';
   });
 }
@@ -1741,6 +1773,7 @@ function renderAssessment(el, r, idx) {
 
   // Eval highlights from AI
   var eh = r.evalHighlights;
+  var criteria = r.criteria || [];
   if (eh) {
     var thresholdMet = eh.meetsThreshold;
     html += '<div class="ai-section-title">Evaluation Data Summary</div>';
