@@ -637,7 +637,7 @@ tbody tr:hover > td { background: #faf9f7; }
     </div>
     <div class="batch-summary" id="batchSummary"></div>
     <button class="btn-batch" id="exportCsvBtn" onclick="exportCSV()" style="display:none;background:var(--green)">Export to CSV</button>
-    <button class="btn-batch" id="exportWordBtn" onclick="downloadAllWordDocs()" style="display:none;background:var(--blue)">Download All as Word</button>
+    <button class="btn-batch" id="exportWordBtn" onclick="downloadAllWordDocs()" style="display:none;background:#1a4d7a">Download All as Word</button>
   </div>
 
   <div class="table-card" id="tableCard">
@@ -1183,10 +1183,10 @@ function runBatchAssessments() {
       stopBtn.style.display = 'none';
       btn.disabled = false;
       btn.textContent = idx >= total ? 'Re-run All Assessments' : 'Resume / Re-run All';
-      if (idx >= total) {
-        label.textContent = 'All ' + total + ' assessments complete';
-        document.getElementById('exportWordBtn').style.display = 'inline-block';
-      }
+      if (idx >= total) label.textContent = 'All ' + total + ' assessments complete';
+      // Show word download if any assessments completed
+      var anyAssessed = S.rows.some(function(r) { return r._aiResult; });
+      if (anyAssessed) document.getElementById('exportWordBtn').style.display = 'inline-block';
       return;
     }
 
@@ -2098,6 +2098,7 @@ function renderAssessment(el, r, idx) {
     html += '</div>';
   }
   var criteria = r.criteria || [];
+  var eh = r.evalHighlights || null;
   if (eh) {
     var thresholdMet = eh.meetsThreshold;
     html += '<div class="ai-section-title">Evaluation Data Summary</div>';
