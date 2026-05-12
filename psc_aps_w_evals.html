@@ -549,6 +549,8 @@ tbody tr:hover > td { background: #faf9f7; }
 }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
@@ -635,6 +637,7 @@ tbody tr:hover > td { background: #faf9f7; }
     </div>
     <div class="batch-summary" id="batchSummary"></div>
     <button class="btn-batch" id="exportCsvBtn" onclick="exportCSV()" style="display:none;background:var(--green)">Export to CSV</button>
+    <button class="btn-batch" id="exportWordBtn" onclick="downloadAllWordDocs()" style="display:none;background:var(--blue)">Download All as Word</button>
   </div>
 
   <div class="table-card" id="tableCard">
@@ -666,7 +669,8 @@ tbody tr:hover > td { background: #faf9f7; }
     <div class="overlay-name" id="ovName"></div>
     <div class="overlay-meta" id="ovMeta"></div>
     <button class="btn-print" onclick="window.print()">Print Survey</button>
-    <button class="btn-print" id="btnDownloadAssessment" onclick="downloadAssessment()" style="display:none">Download Assessment</button>
+    <button class="btn-print" id="btnDownloadAssessment" onclick="downloadAssessment()" style="display:none">Download HTML</button>
+    <button class="btn-print" id="btnDownloadWord" onclick="downloadWordDoc(S.currentReviewIdx)" style="display:none">Download Word</button>
     <button class="btn-close-overlay" onclick="closeReview()">Close</button>
   </div>
   <div class="overlay-tabs">
@@ -1000,6 +1004,7 @@ function buildRoster() {
   document.getElementById('batchBtn').textContent = 'Run All AI Assessments';
   document.getElementById('batchStopBtn').style.display = 'none';
   document.getElementById('exportCsvBtn').style.display = 'inline-block';
+  document.getElementById('exportWordBtn').style.display = 'none'; // only after assessments run
   S.batchStopped = false;
 
   // Build warnings panel
@@ -1178,7 +1183,10 @@ function runBatchAssessments() {
       stopBtn.style.display = 'none';
       btn.disabled = false;
       btn.textContent = idx >= total ? 'Re-run All Assessments' : 'Resume / Re-run All';
-      if (idx >= total) label.textContent = 'All ' + total + ' assessments complete';
+      if (idx >= total) {
+        label.textContent = 'All ' + total + ' assessments complete';
+        document.getElementById('exportWordBtn').style.display = 'inline-block';
+      }
       return;
     }
 
@@ -1786,6 +1794,7 @@ function switchTab(tab) {
   document.getElementById('tab-evals').classList.remove('active');
   document.getElementById('tab-ai').classList.remove('active');
   document.getElementById('btnDownloadAssessment').style.display = 'none';
+  document.getElementById('btnDownloadWord').style.display = 'none';
 
   if (tab === 'both') {
     body.className = 'overlay-body view-both';
@@ -1797,16 +1806,20 @@ function switchTab(tab) {
     if (evEl.dataset.idx !== String(S.currentReviewIdx)) {
       evEl.dataset.idx = String(S.currentReviewIdx);
       var row = S.rows[S.currentReviewIdx];
-      var duid = row ? (row['DU ID'] || '').trim() : '';
+      var duid = row ? String(parseInt((row['DU ID'] || '0'), 10)).trim() : '';
       renderEvals(evEl, duid, S.currentReviewIdx);
     }
   } else {
     body.className = 'overlay-body view-ai';
     document.getElementById('tab-ai').classList.add('active');
-    document.getElementById('btnDownloadAssessment').style.display = 'inline-block';
     var aiEl = document.getElementById('ovAI');
-    if (aiEl.dataset.idx !== String(S.currentReviewIdx)) {
+    var hasResult = S.rows[S.currentReviewIdx] && S.rows[S.currentReviewIdx]._aiResult;
+    var alreadyRendered = aiEl.dataset.idx === String(S.currentReviewIdx) && aiEl.innerHTML.trim() !== '';
+    if (!alreadyRendered) {
       runAIAssessment(S.currentReviewIdx);
+    } else {
+      document.getElementById('btnDownloadAssessment').style.display = 'inline-block';
+      document.getElementById('btnDownloadWord').style.display = 'inline-block';
     }
   }
 }
@@ -1987,6 +2000,8 @@ function runAIAssessment(idx) {
     var result = JSON.parse(text);
     row._aiResult = result;
     renderAssessment(aiEl, result, idx);
+    document.getElementById('btnDownloadAssessment').style.display = 'inline-block';
+    document.getElementById('btnDownloadWord').style.display = 'inline-block';
   })
   .catch(function(err) {
     aiEl.innerHTML =
@@ -2279,6 +2294,352 @@ function exportCSV() {
   a.href = URL.createObjectURL(blob);
   a.download = 'APS_AI_Assessments_' + new Date().toISOString().substring(0,10) + '.csv';
   a.click();
+}
+
+// ── BUILD WORD DOC FOR ONE CANDIDATE ──
+function buildWordDoc(idx) {
+  var row = S.rows[idx];
+  if (!row || !row._aiResult) return null;
+
+  var r = row._aiResult;
+  var first = row['RecipientFirstName'] || '';
+  var last  = row['RecipientLastName']  || '';
+  var email = row['RecipientEmail'] || row['Personal Email'] || '';
+  var recorded = row['RecordedDate'] || '';
+  var rid = row['ResponseId'] || '';
+  var nameStr = (last && first) ? last + ', ' + first : (last || first || 'Candidate');
+  var dateStr = '';
+  if (recorded) { try { var d = new Date(recorded); dateStr = (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); } catch(e) {} }
+  var today = new Date(); var todayStr = (today.getMonth()+1)+'/'+today.getDate()+'/'+today.getFullYear();
+
+  var rankKey = (r.recommendedRank||'').toLowerCase().indexOf('full')>=0?'full'
+    :(r.recommendedRank||'').toLowerCase().indexOf('associate')>=0?'associate':'assistant';
+  var rankColor = rankKey==='full'?'276b43':rankKey==='associate'?'996600':'1a4d7a';
+  var crimson = '8B1A2B';
+
+  var D = docx;
+
+  function heading(text, level) {
+    return new D.Paragraph({
+      children: [new D.TextRun({ text: text, bold: true, size: level===1?28:24, color: crimson, font: 'Arial' })],
+      spacing: { before: level===1?240:180, after: 120 }
+    });
+  }
+  function para(text, opts) {
+    opts = opts || {};
+    return new D.Paragraph({
+      children: [new D.TextRun({ text: String(text||''), size: opts.size||22, bold: opts.bold||false, color: opts.color||'000000', font: 'Arial', italics: opts.italics||false })],
+      spacing: { before: opts.before||60, after: opts.after||60 }
+    });
+  }
+  function labelValue(label, value) {
+    return new D.Paragraph({
+      children: [
+        new D.TextRun({ text: label + ': ', bold: true, size: 20, font: 'Arial', color: '444444' }),
+        new D.TextRun({ text: String(value||'—'), size: 20, font: 'Arial', color: '000000' })
+      ],
+      spacing: { before: 40, after: 40 }
+    });
+  }
+  function divider() {
+    return new D.Paragraph({
+      border: { bottom: { style: D.BorderStyle.SINGLE, size: 4, color: 'e0e0e0', space: 1 } },
+      spacing: { before: 120, after: 120 }
+    });
+  }
+
+  var border = { style: D.BorderStyle.SINGLE, size: 1, color: 'DDDDDD' };
+  var borders = { top: border, bottom: border, left: border, right: border };
+  var cellMargins = { top: 80, bottom: 80, left: 120, right: 120 };
+
+  function scoreCell(val, width) {
+    var sc = parseInt(val)||0;
+    var color = sc===4?'276b43':sc===3?'1a4d7a':sc===2?'996600':sc===1?'8B1A2B':'666666';
+    var label = sc===4?'4 — Exceeds':sc===3?'3 — Meets':sc===2?'2 — Needs Impr.':sc===1?'1 — Unsatisfactory':'N/A';
+    return new D.TableCell({
+      borders, margins: cellMargins,
+      width: { size: width, type: D.WidthType.DXA },
+      children: [new D.Paragraph({ children: [new D.TextRun({ text: label, bold: true, size: 18, color: color, font: 'Arial' })] })]
+    });
+  }
+
+  // Build criteria table
+  var criteriaRows = [
+    new D.TableRow({
+      tableHeader: true,
+      children: [
+        new D.TableCell({ borders, margins: cellMargins, width: { size: 3600, type: D.WidthType.DXA }, shading: { fill: 'F2F1EF', type: D.ShadingType.CLEAR },
+          children: [new D.Paragraph({ children: [new D.TextRun({ text: 'Criterion', bold: true, size: 18, font: 'Arial', color: crimson })] })] }),
+        new D.TableCell({ borders, margins: cellMargins, width: { size: 1800, type: D.WidthType.DXA }, shading: { fill: 'F2F1EF', type: D.ShadingType.CLEAR },
+          children: [new D.Paragraph({ children: [new D.TextRun({ text: 'Rating', bold: true, size: 18, font: 'Arial', color: crimson })] })] }),
+        new D.TableCell({ borders, margins: cellMargins, width: { size: 3960, type: D.WidthType.DXA }, shading: { fill: 'F2F1EF', type: D.ShadingType.CLEAR },
+          children: [new D.Paragraph({ children: [new D.TextRun({ text: 'Rationale', bold: true, size: 18, font: 'Arial', color: crimson })] })] })
+      ]
+    })
+  ];
+
+  var pillarLabels = { teaching: 'Teaching Excellence', service: 'Service', scholarship: 'Scholarship' };
+  var lastPillar = '';
+  (r.criteria||[]).forEach(function(c) {
+    if (c.pillar !== lastPillar) {
+      criteriaRows.push(new D.TableRow({
+        children: [
+          new D.TableCell({ borders, margins: cellMargins, columnSpan: 3,
+            width: { size: 9360, type: D.WidthType.DXA },
+            shading: { fill: 'FDF5F6', type: D.ShadingType.CLEAR },
+            children: [new D.Paragraph({ children: [new D.TextRun({ text: pillarLabels[c.pillar]||c.pillar, bold: true, size: 19, color: crimson, font: 'Arial' })] })]
+          })
+        ]
+      }));
+      lastPillar = c.pillar;
+    }
+    criteriaRows.push(new D.TableRow({
+      children: [
+        new D.TableCell({ borders, margins: cellMargins, width: { size: 3600, type: D.WidthType.DXA },
+          children: [new D.Paragraph({ children: [new D.TextRun({ text: c.name||'', size: 19, font: 'Arial' })] })] }),
+        scoreCell(c.score, 1800),
+        new D.TableCell({ borders, margins: cellMargins, width: { size: 3960, type: D.WidthType.DXA },
+          children: [new D.Paragraph({ children: [new D.TextRun({ text: c.rationale||'', size: 18, font: 'Arial', color: '444444', italics: true })] })] })
+      ]
+    }));
+  });
+
+  // Gates checklist
+  var gatesChildren = [];
+  var gates = r.gatesAssessment || {};
+  var gateItems = [
+    { key: 'evalScoreMeetsThreshold', label: 'Eval Score Threshold Met' },
+    { key: 'activeIndustryEngagement', label: 'Active Industry Engagement' },
+    { key: 'experientialLearningEvidence', label: 'Experiential Learning Opportunity' },
+    { key: 'committeeEngagement', label: 'Committee / Governance Participation' },
+    { key: 'presentationOrPublication', label: 'Presentation or Publication' }
+  ];
+  gateItems.forEach(function(g) {
+    var val = gates[g.key];
+    var icon = val===true?'[YES]':val===false?'[NO]':'[?]';
+    var color = val===true?'276b43':val===false?'8B1A2B':'996600';
+    gatesChildren.push(new D.Paragraph({
+      children: [
+        new D.TextRun({ text: icon + ' ', bold: true, size: 20, color: color, font: 'Arial' }),
+        new D.TextRun({ text: g.label, size: 20, font: 'Arial' })
+      ],
+      spacing: { before: 40, after: 40 }
+    }));
+  });
+  if (gates.pdRequirementMet) {
+    gatesChildren.push(new D.Paragraph({
+      children: [new D.TextRun({ text: '[PD] ' + gates.pdRequirementMet, bold: true, size: 20, font: 'Arial', color: '1a4d7a' })],
+      spacing: { before: 40, after: 40 }
+    }));
+  }
+
+  // Flags
+  var flagChildren = (r.flags||[]).filter(Boolean).map(function(f) {
+    return new D.Paragraph({
+      children: [new D.TextRun({ text: '\u26A0 ' + f, size: 20, font: 'Arial', color: '996600' })],
+      spacing: { before: 40, after: 40 }
+    });
+  });
+
+  // Eval highlights
+  var ehChildren = [];
+  var eh = r.evalHighlights;
+  if (eh) {
+    ehChildren.push(labelValue('Overall Q3 Score', eh.overallQ3 ? Number(eh.overallQ3).toFixed(2)+'/6' : 'N/A'));
+    ehChildren.push(labelValue('Score Threshold Met', eh.meetsThreshold ? 'Yes' : 'No'));
+    ehChildren.push(labelValue('Trend', eh.trend||''));
+    if (eh.strengthThemes) ehChildren.push(labelValue('Student Praise Themes', eh.strengthThemes));
+    if (eh.improvementThemes) ehChildren.push(labelValue('Student Improvement Themes', eh.improvementThemes));
+  }
+
+  var doc = new D.Document({
+    styles: {
+      default: { document: { run: { font: 'Arial', size: 22 } } }
+    },
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 12240, height: 15840 },
+          margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 }
+        }
+      },
+      children: [
+        // Title block
+        new D.Paragraph({
+          children: [new D.TextRun({ text: 'PSC Adjunct Professorial Series', size: 20, color: 'ffffff', font: 'Arial' })],
+          shading: { fill: crimson, type: D.ShadingType.CLEAR },
+          spacing: { before: 0, after: 0 },
+          indent: { left: 120, right: 120 }
+        }),
+        new D.Paragraph({
+          children: [new D.TextRun({ text: 'Initial Appointment — AI Assessment', size: 20, color: 'ffcccc', font: 'Arial' })],
+          shading: { fill: crimson, type: D.ShadingType.CLEAR },
+          spacing: { before: 0, after: 240 },
+          indent: { left: 120, right: 120 }
+        }),
+
+        // Candidate info
+        new D.Paragraph({
+          children: [new D.TextRun({ text: nameStr, bold: true, size: 36, font: 'Arial', color: '1a1a1a' })],
+          spacing: { before: 0, after: 80 }
+        }),
+        labelValue('DU Email', email),
+        labelValue('Submitted', dateStr),
+        labelValue('Response ID', rid),
+        labelValue('Assessment Generated', todayStr),
+        divider(),
+
+        // Recommendation
+        heading('Preliminary Rank Recommendation', 1),
+        new D.Paragraph({
+          children: [new D.TextRun({ text: r.recommendedRank||'', bold: true, size: 30, font: 'Arial', color: rankColor })],
+          spacing: { before: 60, after: 60 }
+        }),
+        new D.Paragraph({
+          children: [new D.TextRun({ text: 'Confidence: ' + (r.confidence||0) + '%', size: 20, font: 'Arial', color: '666666', bold: true })],
+          spacing: { before: 0, after: 120 }
+        }),
+        para(r.summary||'', { italics: true, color: '444444' }),
+        divider(),
+
+        // Hard gates
+        heading('Hard Gate Assessment', 1)
+      ].concat(gatesChildren).concat([
+        divider(),
+
+        // Pillar scores
+        heading('Pillar Scores', 1),
+        labelValue('Teaching Excellence (70%)', 'Score: ' + ((r.pillars&&r.pillars.teaching)?r.pillars.teaching.score:'N/A') + '/4'),
+        para((r.pillars&&r.pillars.teaching&&r.pillars.teaching.notes)||'', { color: '444444', italics: true }),
+        labelValue('Service (20%)', 'Score: ' + ((r.pillars&&r.pillars.service)?r.pillars.service.score:'N/A') + '/4'),
+        para((r.pillars&&r.pillars.service&&r.pillars.service.notes)||'', { color: '444444', italics: true }),
+        labelValue('Scholarship (10%)', 'Score: ' + ((r.pillars&&r.pillars.scholarship)?r.pillars.scholarship.score:'N/A') + '/4'),
+        para((r.pillars&&r.pillars.scholarship&&r.pillars.scholarship.notes)||'', { color: '444444', italics: true }),
+        divider(),
+
+        // Criteria table
+        heading('Rubric Criteria Detail', 1),
+        new D.Table({
+          width: { size: 9360, type: D.WidthType.DXA },
+          columnWidths: [3600, 1800, 3960],
+          rows: criteriaRows
+        }),
+        new D.Paragraph({ spacing: { before: 240, after: 0 } }),
+        divider()
+      ]).concat(
+        ehChildren.length ? [heading('Evaluation Data Summary', 1)].concat(ehChildren).concat([divider()]) : []
+      ).concat(
+        flagChildren.length ? [heading('Flags & Gaps', 1)].concat(flagChildren).concat([divider()]) : []
+      ).concat([
+        // Evaluator section
+        heading('Evaluator Decision', 1),
+        labelValue('Rank Confirmed', '  '),
+        labelValue('Rank Advancement', '  '),
+        labelValue('Support Plan', '  '),
+        labelValue('Rank Adjusted', '  '),
+        labelValue('Non-Reappointment', '  '),
+        new D.Paragraph({ spacing: { before: 240, after: 60 } }),
+        para('Evaluator Comments:', { bold: true }),
+        new D.Paragraph({
+          border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
+          spacing: { before: 200, after: 200 }
+        }),
+        new D.Paragraph({
+          border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
+          spacing: { before: 200, after: 200 }
+        }),
+        new D.Paragraph({ spacing: { before: 240, after: 60 } }),
+        para('Faculty Response / Comments:', { bold: true }),
+        new D.Paragraph({
+          border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
+          spacing: { before: 200, after: 200 }
+        }),
+        new D.Paragraph({
+          border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
+          spacing: { before: 200, after: 200 }
+        }),
+        new D.Paragraph({ spacing: { before: 240, after: 0 } }),
+        para('This is a preliminary AI-assisted assessment based on survey responses and evaluation data. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.', { italics: true, color: '999999', size: 18 })
+      ])
+    }]
+  });
+
+  return doc;
+}
+
+// ── DOWNLOAD SINGLE WORD DOC ──
+function downloadWordDoc(idx) {
+  var row = S.rows[idx];
+  if (!row || !row._aiResult) {
+    alert('Run the AI assessment first before downloading.');
+    return;
+  }
+  var first = row['RecipientFirstName'] || '';
+  var last  = row['RecipientLastName']  || '';
+  var today = new Date();
+  var dateForFile = (today.getMonth()+1) + '-' + today.getDate() + '-' + today.getFullYear();
+  var filename = 'PSC_Appointment_' + (last||'Unknown') + '_' + (first||'') + '_' + dateForFile + '.docx';
+  filename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+
+  var doc = buildWordDoc(idx);
+  if (!doc) return;
+
+  docx.Packer.toBlob(doc).then(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  }).catch(function(err) {
+    alert('Word generation failed: ' + err.message);
+  });
+}
+
+// ── DOWNLOAD ALL WORD DOCS AS ZIP ──
+function downloadAllWordDocs() {
+  var assessed = S.rows.filter(function(r) { return r._aiResult; });
+  if (!assessed.length) { alert('No assessed candidates. Run batch assessments first.'); return; }
+
+  var btn = document.getElementById('exportWordBtn');
+  btn.disabled = true;
+  btn.textContent = 'Building...';
+
+  var zip = new JSZip();
+  var today = new Date();
+  var dateForFile = (today.getMonth()+1) + '-' + today.getDate() + '-' + today.getFullYear();
+  var promises = [];
+
+  S.rows.forEach(function(row, idx) {
+    if (!row._aiResult) return;
+    var first = row['RecipientFirstName'] || '';
+    var last  = row['RecipientLastName']  || '';
+    var filename = 'PSC_Appointment_' + (last||'Unknown') + '_' + (first||'') + '_' + dateForFile + '.docx';
+    filename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+
+    var doc = buildWordDoc(idx);
+    if (!doc) return;
+
+    var p = docx.Packer.toBlob(doc).then(function(blob) {
+      return blob.arrayBuffer().then(function(buf) {
+        zip.file(filename, buf);
+      });
+    });
+    promises.push(p);
+  });
+
+  Promise.all(promises).then(function() {
+    return zip.generateAsync({ type: 'blob' });
+  }).then(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'PSC_APS_Assessments_' + dateForFile + '.zip';
+    a.click();
+    btn.disabled = false;
+    btn.textContent = 'Download All as Word';
+  }).catch(function(err) {
+    alert('Zip generation failed: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Download All as Word';
+  });
 }
 
 function closeReview() {
