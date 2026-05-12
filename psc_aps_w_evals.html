@@ -1230,7 +1230,16 @@ function onEvals(evt) {
   if (!file) return;
 
   var isXlsx = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
+
+  if (isXlsx && typeof XLSX === 'undefined') {
+    showError('SheetJS library not loaded yet — please wait a moment and try again, or use a CSV export instead.');
+    document.getElementById('evalFile').value = '';
+    return;
+  }
+
   var reader = new FileReader();
+
+  reader.onerror = function() { showError('Could not read eval file — please try again.'); };
 
   reader.onload = function(e) {
     try {
@@ -1241,7 +1250,7 @@ function onEvals(evt) {
         var workbook = XLSX.read(data, { type: 'array' });
         var sheetName = workbook.SheetNames[0];
         var sheet = workbook.Sheets[sheetName];
-        rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
       } else {
         var parsed = parseCSV(e.target.result);
         if (parsed.length < 2) { showError('Eval file appears empty.'); return; }
@@ -1257,12 +1266,14 @@ function onEvals(evt) {
         }
       }
 
+      if (!rows.length) { showError('No data rows found in eval file.'); return; }
+
       S.evalRows = [];
       S.evalByDUID = {};
 
       rows.forEach(function(obj) {
         var did = String(obj['DU ID'] || '').trim();
-        if (!did) return;
+        if (!did || did === 'DU ID') return;
         S.evalRows.push(obj);
         if (!S.evalByDUID[did]) S.evalByDUID[did] = [];
         S.evalByDUID[did].push(obj);
@@ -1274,7 +1285,7 @@ function onEvals(evt) {
         S.evalRows.length.toLocaleString() + ' eval rows loaded — ' + instructorCount + ' instructors';
       hideError();
     } catch(err) {
-      showError('Could not read eval file: ' + err.message);
+      showError('Could not parse eval file: ' + err.message);
     }
   };
 
