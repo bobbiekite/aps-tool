@@ -1200,7 +1200,7 @@ function runBatchAssessments() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
+        max_tokens: 6000,
         messages: [{ role: 'user', content: prompt }]
       })
     })
@@ -1662,7 +1662,7 @@ function synthesizeComments(idx) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      max_tokens: 6000,
       messages: [{ role: 'user', content: prompt }]
     })
   })
@@ -1775,15 +1775,14 @@ function buildEvalPromptText(duid) {
   // Add pre-computed synthesis if available
   var synth = S.synthByDUID[duid];
   if (synth && synth.synthesis) {
+    var synthTrimmed = synth.synthesis.length > 2000 ? synth.synthesis.substring(0, 2000) + '...[truncated for length]' : synth.synthesis;
     text += '\nSTUDENT COMMENT SYNTHESIS (pre-computed from Q22/Q23, terms: ' + synth.termsCovered + ', ' + synth.q22Count + ' strength comments, ' + synth.q23Count + ' improvement comments):\n\n';
-    text += synth.synthesis + '\n\n';
-    text += 'SYNTHESIS WEIGHTING GUIDANCE FOR EVALUATOR:\n';
-    text += '- Teaching Excellence patterns in student comments are primary evidence — weight them heavily, consistent with the 70% rubric weight for this pillar.\n';
-    text += '- Service and Scholarship patterns from student comments are corroborating evidence only. Students observe teaching directly but do not observe committee work, PD activity, grant activity, or publications.\n';
-    text += '- Use Service/Scholarship comment patterns as additive evidence at borderline decisions (e.g. tipping a borderline Assistant toward Associate when other gate criteria are met).\n';
-    text += '- Never penalize an instructor in the Service or Scholarship pillar based on absence of student comment in those areas. The survey responses and quantitative eval data are the primary evidence for those pillars.\n';
-    text += '- Hard gates for Service and Scholarship still apply regardless of student comment patterns.\n';
-    if (synth.dataFlag) text += '\nDATA FLAG: ' + synth.dataFlag + '\n';
+    text += synthTrimmed + '\n\n';
+    text += 'SYNTHESIS WEIGHTING GUIDANCE:\n';
+    text += '- Teaching Excellence comment patterns are primary evidence (70% weight).\n';
+    text += '- Service/Scholarship comment patterns are additive only at borderline decisions — never penalize their absence.\n';
+    text += '- Hard gates still apply regardless of comment patterns.\n';
+    if (synth.dataFlag) text += 'DATA FLAG: ' + synth.dataFlag + '\n';
   }
 
   return text;
@@ -1995,7 +1994,7 @@ function runAIAssessment(idx) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      max_tokens: 6000,
       messages: [{ role: 'user', content: prompt }]
     })
   })
