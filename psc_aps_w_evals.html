@@ -2604,59 +2604,59 @@ function downloadWordDoc(idx) {
   });
 }
 
-// ── DOWNLOAD ALL WORD DOCS INDIVIDUALLY (sequential) ──
+// ── DOWNLOAD ALL WORD DOCS INDIVIDUALLY ──
 function downloadAllWordDocs() {
   var assessed = S.rows.filter(function(r) { return r._aiResult; });
   if (!assessed.length) { alert('No assessed candidates. Run batch assessments first.'); return; }
 
   var btn = document.getElementById('exportWordBtn');
   btn.disabled = true;
+  btn.textContent = 'Generating...';
 
   var today = new Date();
   var dateForFile = (today.getMonth()+1) + '-' + today.getDate() + '-' + today.getFullYear();
-  var indices = [];
-  S.rows.forEach(function(row, idx) { if (row._aiResult) indices.push(idx); });
 
-  var current = 0;
-
-  function downloadNext() {
-    if (current >= indices.length) {
-      btn.disabled = false;
-      btn.textContent = 'Download All as Word';
-      return;
-    }
-
-    var idx = indices[current];
-    var row = S.rows[idx];
+  // Pre-build all docs first, then download them all in one synchronous pass
+  var pending = [];
+  S.rows.forEach(function(row, idx) {
+    if (!row._aiResult) return;
     var first = row['RecipientFirstName'] || '';
     var last  = row['RecipientLastName']  || '';
     var filename = 'PSC_Appointment_' + (last||'Unknown') + '_' + (first||'') + '_' + dateForFile + '.docx';
     filename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '');
-
-    btn.textContent = 'Downloading ' + (current+1) + ' of ' + indices.length + '...';
-
     var doc = buildWordDoc(idx);
-    if (!doc) { current++; setTimeout(downloadNext, 200); return; }
+    if (doc) pending.push({ doc: doc, filename: filename });
+  });
 
-    docx.Packer.toBlob(doc).then(function(blob) {
+  if (!pending.length) { btn.disabled = false; btn.textContent = 'Download All as Word'; return; }
+
+  // Convert all to blobs in parallel, then trigger downloads
+  btn.textContent = 'Building ' + pending.length + ' docs...';
+  var blobPromises = pending.map(function(p) {
+    return docx.Packer.toBlob(p.doc).then(function(blob) {
+      return { blob: blob, filename: p.filename };
+    });
+  });
+
+  Promise.all(blobPromises).then(function(results) {
+    // Trigger all downloads synchronously in one pass — Chrome allows this from a resolved Promise
+    results.forEach(function(r) {
+      var url = URL.createObjectURL(r.blob);
       var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = filename;
+      a.href = url;
+      a.download = r.filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
-      current++;
-      // Small delay between downloads so browser doesn't block them
-      setTimeout(downloadNext, 800);
-    }).catch(function(err) {
-      console.error('Word generation failed for ' + filename + ': ' + err.message);
-      current++;
-      setTimeout(downloadNext, 800);
+      URL.revokeObjectURL(url);
     });
-  }
-
-  downloadNext();
+    btn.disabled = false;
+    btn.textContent = 'Download All as Word';
+  }).catch(function(err) {
+    alert('Download failed: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Download All as Word';
+  });
 }
 
 function closeReview() {
