@@ -584,7 +584,7 @@ tbody tr:hover > td { background: #faf9f7; }
       <input type="file" id="evalFile" accept=".csv,.xlsx">
       <div class="uz-icon">&#128200;</div>
       <div class="uz-title">Course Evaluations (CSV or XLSX)</div>
-      <div class="uz-hint">Static reference file — matched to respondents by DU ID. XLSX or CSV.</div>
+      <div class="uz-hint">Static reference file with eval data + Instructor_Syntheses sheet — matched by DU ID. XLSX or CSV.</div>
       <div class="uz-status" id="evalStatus"></div>
     </div>
   </div>
@@ -628,6 +628,7 @@ tbody tr:hover > td { background: #faf9f7; }
   <!-- BATCH RUN BAR -->
   <div class="batch-bar" id="batchBar">
     <button class="btn-batch" id="batchBtn" onclick="runBatchAssessments()">Run All AI Assessments</button>
+    <button class="btn-batch" id="batchStopBtn" onclick="stopBatch()" style="display:none;background:#666">Stop</button>
     <div class="batch-progress-wrap">
       <div class="batch-progress-label" id="batchLabel">Ready to run assessments for all candidates</div>
       <div class="batch-progress-bg"><div class="batch-progress-fill" id="batchFill"></div></div>
@@ -691,8 +692,10 @@ var S = {
   labels: {},
   currentReviewIdx: null,
   apiKey: '',
-  evalRows: [],      // all rows from eval file
-  evalByDUID: {}     // DU ID -> array of eval rows
+  evalRows: [],
+  evalByDUID: {},
+  synthByDUID: {},
+  batchStopped: false
 };
 
 function saveKey() {
@@ -740,7 +743,7 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('buildBtn').addEventListener('click', buildRoster);
   document.getElementById('evalClear').addEventListener('click', function(e) {
     e.stopPropagation();
-    S.evalRows = []; S.evalByDUID = {};
+    S.evalRows = []; S.evalByDUID = {}; S.synthByDUID = {};
     document.getElementById('evalZone').classList.remove('loaded');
     document.getElementById('evalStatus').textContent = '';
     document.getElementById('evalFile').value = '';
@@ -995,6 +998,9 @@ function buildRoster() {
   document.getElementById('batchSummary').textContent = '';
   document.getElementById('batchBtn').disabled = false;
   document.getElementById('batchBtn').textContent = 'Run All AI Assessments';
+  document.getElementById('batchStopBtn').style.display = 'none';
+  document.getElementById('exportCsvBtn').style.display = 'inline-block';
+  S.batchStopped = false;
 
   // Build warnings panel
   // Scenario A: CSV rows with no CV
@@ -1130,16 +1136,27 @@ function openReview(idx) {
 }
 
 // ── BATCH RUN ALL ASSESSMENTS ──
+function stopBatch() {
+  S.batchStopped = true;
+  document.getElementById('batchStopBtn').style.display = 'none';
+  document.getElementById('batchBtn').disabled = false;
+  document.getElementById('batchBtn').textContent = 'Resume / Re-run All';
+  document.getElementById('batchLabel').textContent += ' — stopped';
+}
+
 function runBatchAssessments() {
   if (!S.rows.length) return;
 
   var btn = document.getElementById('batchBtn');
+  var stopBtn = document.getElementById('batchStopBtn');
   var label = document.getElementById('batchLabel');
   var fill = document.getElementById('batchFill');
   var summary = document.getElementById('batchSummary');
 
+  S.batchStopped = false;
   btn.disabled = true;
   btn.textContent = 'Running...';
+  stopBtn.style.display = 'inline-block';
 
   var total = S.rows.length;
   var completed = 0;
@@ -1156,21 +1173,17 @@ function runBatchAssessments() {
       (counts.error ? '  Errors: ' + counts.error : '');
   }
 
-  // Process sequentially with a small gap to avoid rate limits
   function processNext(idx) {
-    if (idx >= total) {
-      // All done
+    if (S.batchStopped || idx >= total) {
+      stopBtn.style.display = 'none';
       btn.disabled = false;
-      btn.textContent = 'Re-run All Assessments';
-      label.textContent = 'All ' + total + ' assessments complete';
-      document.getElementById('exportCsvBtn').style.display = 'inline-block';
+      btn.textContent = idx >= total ? 'Re-run All Assessments' : 'Resume / Re-run All';
+      if (idx >= total) label.textContent = 'All ' + total + ' assessments complete';
       return;
     }
 
     var row = S.rows[idx];
     var prompt = buildPrompt(row);
-
-    // Mark roster badge as in-progress
     var badgeEl = document.getElementById('airecbadge-' + idx);
     if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px">...</span>';
 
@@ -1179,7 +1192,7 @@ function runBatchAssessments() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 2500,
         messages: [{ role: 'user', content: prompt }]
       })
     })
@@ -1192,11 +1205,8 @@ function runBatchAssessments() {
       }
       text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
       var result = JSON.parse(text);
-
-      // Store result so Review overlay can use it without re-running
       S.rows[idx]._aiResult = result;
 
-      // Update roster badge
       var rankKey = (result.recommendedRank || '').toLowerCase().indexOf('full') >= 0 ? 'full'
         : (result.recommendedRank || '').toLowerCase().indexOf('associate') >= 0 ? 'associate'
         : 'assistant';
@@ -1215,7 +1225,6 @@ function runBatchAssessments() {
     .finally(function() {
       completed++;
       updateProgress();
-      // 300ms gap between calls to avoid rate limiting
       setTimeout(function() { processNext(idx + 1); }, 300);
     });
   }
@@ -1244,10 +1253,11 @@ function onEvals(evt) {
   reader.onload = function(e) {
     try {
       var rows = [];
+      var workbook = null;
 
       if (isXlsx) {
         var data = new Uint8Array(e.target.result);
-        var workbook = XLSX.read(data, { type: 'array' });
+        workbook = XLSX.read(data, { type: 'array' });
         var sheetName = workbook.SheetNames[0];
         var sheet = workbook.Sheets[sheetName];
         rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
@@ -1270,24 +1280,51 @@ function onEvals(evt) {
 
       S.evalRows = [];
       S.evalByDUID = {};
+      S.synthByDUID = {};
 
       rows.forEach(function(obj) {
-        // Normalize DU ID — handle integer, float, or string from XLSX
-        var rawDUID = obj['DU ID'];
+        var rawDUID = obj['DU ID'] !== undefined ? obj['DU ID'] : obj['UniqueID'];
         var did = rawDUID !== undefined && rawDUID !== null && rawDUID !== ''
-          ? String(parseInt(rawDUID, 10)).trim()
-          : '';
+          ? String(parseInt(rawDUID, 10)).trim() : '';
         if (!did || did === 'NaN' || did === 'DU ID') return;
-        obj['_did'] = did; // store normalized version
+        obj['_did'] = did;
         S.evalRows.push(obj);
         if (!S.evalByDUID[did]) S.evalByDUID[did] = [];
         S.evalByDUID[did].push(obj);
       });
 
+      // Parse Instructor_Syntheses sheet if present in XLSX
+      if (isXlsx && workbook) {
+        var synthSheetName = workbook.SheetNames.find(function(n) {
+          var clean = n.toLowerCase().replace(/[^a-z]/g, '');
+          return clean.indexOf('synthesis') >= 0 || clean.indexOf('syntheses') >= 0;
+        });
+        if (synthSheetName) {
+          var synthSheet = workbook.Sheets[synthSheetName];
+          var synthRows = XLSX.utils.sheet_to_json(synthSheet, { defval: '', raw: true });
+          synthRows.forEach(function(r) {
+            var rawDUID = r['DU ID'] !== undefined ? r['DU ID'] : r['DU_ID'];
+            var did = rawDUID !== undefined && rawDUID !== null
+              ? String(parseInt(rawDUID, 10)).trim() : '';
+            if (!did || did === 'NaN') return;
+            S.synthByDUID[did] = {
+              instructorName: String(r['Instructor Name'] || ''),
+              termsCovered: String(r['Terms Covered'] || ''),
+              q22Count: r['Q22 Comment Count'] || 0,
+              q23Count: r['Q23 Comment Count'] || 0,
+              synthesis: String(r['Synthesis'] || ''),
+              dataFlag: String(r['Data Flag'] || '')
+            };
+          });
+        }
+      }
+
       var instructorCount = Object.keys(S.evalByDUID).length;
+      var synthCount = Object.keys(S.synthByDUID).length;
       document.getElementById('evalZone').classList.add('loaded');
       document.getElementById('evalStatus').textContent =
-        S.evalRows.length.toLocaleString() + ' eval rows loaded — ' + instructorCount + ' instructors';
+        S.evalRows.length.toLocaleString() + ' eval rows — ' + instructorCount + ' instructors' +
+        (synthCount ? ' — ' + synthCount + ' syntheses loaded' : '');
       hideError();
     } catch(err) {
       showError('Could not parse eval file: ' + err.message);
@@ -1511,9 +1548,22 @@ function renderEvals(el, duid, idx) {
   // Qualitative comments section
   var hasComments = ev.strengths.length > 0 || ev.improvements.length > 0;
   var totalComments = ev.strengths.length + ev.improvements.length;
-  html += '<div class="eval-section-title" style="margin-top:4px">Student Comments — Q22 &amp; Q23 (Last 2 Terms)</div>';
 
-  if (!hasComments) {
+  // Check for pre-computed synthesis
+  var row = S.rows[idx];
+  var duid2 = row ? String(parseInt((row['DU ID'] || '0'), 10)).trim() : '';
+  var presynth = S.synthByDUID[duid2] || null;
+
+  html += '<div class="eval-section-title" style="margin-top:4px">Student Comment Synthesis — Q22 &amp; Q23</div>';
+
+  if (presynth && presynth.synthesis) {
+    // Show pre-computed synthesis
+    html += '<div style="background:var(--blue-bg);border:1px solid #b8d0e8;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:12px;color:var(--blue);font-weight:600">Pre-computed synthesis &mdash; ' + esc(presynth.termsCovered) + ' &mdash; ' + presynth.q22Count + ' strength comments, ' + presynth.q23Count + ' improvement comments</div>';
+    if (presynth.dataFlag) {
+      html += '<div class="flag-item" style="margin-bottom:10px"><span class="flag-icon">&#9888;</span><span>' + esc(presynth.dataFlag) + '</span></div>';
+    }
+    html += '<div style="background:white;border:1px solid var(--rule);border-radius:8px;padding:16px;white-space:pre-wrap;font-size:13px;color:var(--ink-mid);line-height:1.65">' + esc(presynth.synthesis) + '</div>';
+  } else if (!hasComments) {
     html += '<div class="eval-no-data" style="padding:20px">No student comments found for the last 2 terms.</div>';
   } else {
     html += '<div id="evalCommentArea-' + idx + '">';
@@ -1604,7 +1654,7 @@ function synthesizeComments(idx) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 2500,
       messages: [{ role: 'user', content: prompt }]
     })
   })
@@ -1711,23 +1761,21 @@ function buildEvalPromptText(duid) {
   text += '\nCourse question averages (all-time):\n';
   COURSE_QS.forEach(function(q) {
     var v = ev.courseAvgs[q.col];
-    text += '  ' + q.label + ': ' + (v ? v.toFixed(2) : 'N/A') + '/6\n';
+    text += '  ' + v ? v.toFixed(2) : 'N/A' + '/6\n';
   });
 
-  // Q22 strengths themes (last 2 terms, up to 10 comments)
-  if (ev.strengths.length) {
-    text += '\nStudent-reported strengths (Q22, last 2 terms — sample):\n';
-    ev.strengths.slice(0, 10).forEach(function(c) {
-      text += '  [' + c.term + '] ' + c.text.substring(0, 200) + '\n';
-    });
-  }
-
-  // Q23 improvement themes (last 2 terms, up to 10 comments)
-  if (ev.improvements.length) {
-    text += '\nStudent recommendations for improvement (Q23, last 2 terms — sample):\n';
-    ev.improvements.slice(0, 10).forEach(function(c) {
-      text += '  [' + c.term + '] ' + c.text.substring(0, 200) + '\n';
-    });
+  // Add pre-computed synthesis if available
+  var synth = S.synthByDUID[duid];
+  if (synth && synth.synthesis) {
+    text += '\nSTUDENT COMMENT SYNTHESIS (pre-computed from Q22/Q23, terms: ' + synth.termsCovered + ', ' + synth.q22Count + ' strength comments, ' + synth.q23Count + ' improvement comments):\n\n';
+    text += synth.synthesis + '\n\n';
+    text += 'SYNTHESIS WEIGHTING GUIDANCE FOR EVALUATOR:\n';
+    text += '- Teaching Excellence patterns in student comments are primary evidence — weight them heavily, consistent with the 70% rubric weight for this pillar.\n';
+    text += '- Service and Scholarship patterns from student comments are corroborating evidence only. Students observe teaching directly but do not observe committee work, PD activity, grant activity, or publications.\n';
+    text += '- Use Service/Scholarship comment patterns as additive evidence at borderline decisions (e.g. tipping a borderline Assistant toward Associate when other gate criteria are met).\n';
+    text += '- Never penalize an instructor in the Service or Scholarship pillar based on absence of student comment in those areas. The survey responses and quantitative eval data are the primary evidence for those pillars.\n';
+    text += '- Hard gates for Service and Scholarship still apply regardless of student comment patterns.\n';
+    if (synth.dataFlag) text += '\nDATA FLAG: ' + synth.dataFlag + '\n';
   }
 
   return text;
@@ -1767,6 +1815,7 @@ function switchTab(tab) {
 function buildPrompt(row) {
   var name = ((row['RecipientFirstName'] || '') + ' ' + (row['RecipientLastName'] || '')).trim();
   var duid = String(parseInt((row['DU ID'] || '0'), 10) || '').trim();
+  var idx = S.rows.indexOf(row);
 
   var surveyText = '';
   QCOLS.forEach(function(q) {
@@ -1777,60 +1826,121 @@ function buildPrompt(row) {
 
   var evalText = buildEvalPromptText(duid);
 
-  return 'You are an expert faculty evaluator for the University of Denver College of Professional Studies (PSC). ' +
-    'You are performing an initial rank assessment for the Adjunct Professorial Series (APS).\n\n' +
+  return 'You are an expert faculty evaluator for the University of Denver College of Professional Studies (PSC), performing an initial rank assessment for the Adjunct Professorial Series (APS).\n\n' +
 
-    'THE THREE RANKS:\n' +
-    '- Adjunct Assistant Professor: Primary industry involvement, teaches and does light course maintenance. Score 4.5+ on student evals (6-point scale). 1 PD per cycle. Minor curriculum updates.\n' +
-    '- Adjunct Associate Professor: REQUIRES active industry engagement (employment, consulting, board with operational involvement, contract work, or publications). Score 5.0+ on student evals. 2+ PD per cycle. Curriculum updates 15-20hrs. At least 1 experiential learning opportunity per cycle. At least 1 presentation/publication per cycle.\n' +
-    '- Adjunct Professor (Full): REQUIRES active industry engagement. Score 5.0+. Multiple PD. Curriculum leadership 25-30hrs. Broad active network. Leads curriculum committees. Multiple presentations/publications. Recognized research/grants.\n\n' +
+    'CRITICAL INSTRUCTION: You must apply the rubric strictly. DO NOT default to Associate. Many people will qualify only for Assistant. Full rank is rare and requires documented leadership. Be conservative and evidence-based.\n\n' +
+
+    'RATING SCALE: 4=Exceeds, 3=Meets, 2=Needs Improvement, 1=Unsatisfactory, N/A=Not Applicable\n\n' +
+
+    'RUBRIC — HARD GATES (candidate must meet ALL criteria at their rank):\n\n' +
+
+    'ADJUNCT ASSISTANT PROFESSOR (entry level — most first-time appointees will be here):\n' +
+    '  Teaching:\n' +
+    '    - Student eval Q3 score: 4.5 or higher (6-pt scale). If no eval data, note as gap.\n' +
+    '    - Responsive communication with students\n' +
+    '    - Regular course presence (logs in at least every 3 days)\n' +
+    '    - Integrates professional background into instruction\n' +
+    '    - Provides timely feedback (within 6 days)\n' +
+    '    - Keeps course current, reports broken links\n' +
+    '    - Seeks and is open to feedback\n' +
+    '  Service:\n' +
+    '    - At least 1 PD training per appointment cycle\n' +
+    '    - Identifies and reports minor course updates\n' +
+    '    - Maintains active industry connections relevant to teaching area\n' +
+    '    - Stays current with PSC initiatives; attends/watches program meetings\n' +
+    '  Scholarship: N/A — presentations and research NOT required at this rank\n\n' +
+
+    'ADJUNCT ASSOCIATE PROFESSOR (requires documented evidence of ALL of the following):\n' +
+    '  Teaching:\n' +
+    '    - Student eval Q3 score: 5.0 or higher (6-pt scale). HARD GATE — below 5.0 disqualifies.\n' +
+    '    - Proactive, intentional communication that anticipates student needs\n' +
+    '    - Consistent, proactive course presence\n' +
+    '    - Actively leverages industry connections to enrich class and student experience\n' +
+    '    - Feedback connects to learning outcomes\n' +
+    '    - Proactively updates and refreshes course content\n' +
+    '    - Actively reflects on feedback; engages in peer observation\n' +
+    '  Service:\n' +
+    '    - At least 2 PD trainings per cycle — HARD GATE\n' +
+    '    - Completes course updates/curriculum modifications on assigned courses — HARD GATE\n' +
+    '    - Creates at least 1 experiential learning opportunity per cycle (guest speaker, site visit, internship, project partnership) — HARD GATE\n' +
+    '    - Participates on at least 1 curriculum committee, industry advisory group, or governance body — HARD GATE\n' +
+    '    - REQUIRES active industry engagement: employment, consulting, board with operational involvement, contract work, or publications. Volunteer board service alone does NOT qualify.\n' +
+    '  Scholarship:\n' +
+    '    - At least 1 presentation OR 1 publication per cycle — HARD GATE\n' +
+    '    - Conducts or contributes to industry research\n\n' +
+
+    'ADJUNCT PROFESSOR / FULL (rare — requires documented leadership and impact):\n' +
+    '  Teaching:\n' +
+    '    - Q3 score 5.0+ consistently across multiple terms\n' +
+    '    - Models exemplary communication and learning community\n' +
+    '    - Strategically leverages broad industry network to substantially enhance programming\n' +
+    '    - Forward-looking feedback that advances student growth\n' +
+    '    - Ensures course is exemplary; models continuous improvement culture\n' +
+    '  Service:\n' +
+    '    - Multiple PD trainings; contributes to and leads PD initiatives\n' +
+    '    - Leads curriculum committee — HARD GATE\n' +
+    '    - Sustains broad active network; documented impact on student career outcomes — HARD GATE\n' +
+    '    - Leadership roles in professional organizations, editorial boards, conference planning, or college governance\n' +
+    '    - REQUIRES active industry engagement\n' +
+    '  Scholarship:\n' +
+    '    - Multiple presentations or publications; regional or national recognition — HARD GATE\n' +
+    '    - Leads or publishes industry-recognized research\n' +
+    '    - Actively pursues grants with measurable impact on student success\n\n' +
 
     'RUBRIC WEIGHTS: Teaching Excellence 70%, Service 20%, Scholarship 10%.\n\n' +
-    'RATING SCALE: 4=Exceeds Expectations, 3=Meets Expectations, 2=Needs Improvement, 1=Unsatisfactory, 0=N/A\n\n' +
 
     'CANDIDATE: ' + name + '\n\n' +
-    'SURVEY RESPONSES (self-reported):\n' + surveyText + '\n\n' +
+    'SELF-REPORTED SURVEY RESPONSES:\n' + surveyText + '\n\n' +
     evalText + '\n\n' +
 
-    'IMPORTANT NOTES:\n' +
-    '- Use the evaluation data as objective evidence to verify or challenge self-reported survey answers.\n' +
-    '- The eval scale is 1-6. Threshold for Associate/Full is 5.0+.\n' +
-    '- Q3 (Overall Effectiveness) is the primary rubric score. Other instructor questions inform teaching quality.\n' +
-    '- Q22/Q23 student comments are direct evidence — cite specific themes in your rationale.\n' +
-    '- Associate and Full rank REQUIRE active industry engagement. Flag if unclear.\n' +
-    '- If eval scores contradict self-reported answers, note the discrepancy.\n\n' +
+    'SCORING GUIDANCE:\n' +
+    '- Start at Assistant and only move up if there is clear evidence meeting ALL hard gates for the higher rank.\n' +
+    '- Missing evidence = cannot confirm the gate = stay at lower rank.\n' +
+    '- Scholarship criteria (Presentations, Publications, Research/Grants) should be scored N/A for Assistant candidates — do not penalize them for not having these.\n' +
+    '- Eval score below 4.5 = cannot recommend any rank without explanation. Below 5.0 = cannot recommend Associate or Full.\n' +
+    '- Self-reported answers without corroborating eval evidence should be treated as unverified.\n' +
+    '- Confidence should reflect how much hard gate evidence is present: high confidence (80%+) only when most gates are clearly met or clearly not met.\n\n' +
 
-    'Respond ONLY with a valid JSON object, no markdown, no preamble, exactly this structure:\n' +
+    'Respond ONLY with valid JSON, no markdown:\n' +
     '{\n' +
     '  "recommendedRank": "Adjunct Assistant Professor" or "Adjunct Associate Professor" or "Adjunct Professor",\n' +
     '  "confidence": <integer 1-100>,\n' +
-    '  "summary": "<2-3 sentence summary of recommendation reasoning, referencing both survey and eval evidence>",\n' +
+    '  "summary": "<2-3 sentences citing specific evidence from survey AND eval data>",\n' +
+    '  "gatesAssessment": {\n' +
+    '    "evalScoreMeetsThreshold": <true|false|null>,\n' +
+    '    "activeIndustryEngagement": <true|false|null>,\n' +
+    '    "pdRequirementMet": "1+"|"2+"|"unknown",\n' +
+    '    "experientialLearningEvidence": <true|false|null>,\n' +
+    '    "committeeEngagement": <true|false|null>,\n' +
+    '    "presentationOrPublication": <true|false|null>\n' +
+    '  },\n' +
     '  "pillars": {\n' +
-    '    "teaching": { "score": <1-4>, "notes": "<2-3 sentences referencing eval scores and student comments>" },\n' +
-    '    "service": { "score": <1-4>, "notes": "<2-3 sentences>" },\n' +
-    '    "scholarship": { "score": <1-4 or 0 if NA>, "notes": "<2-3 sentences>" }\n' +
+    '    "teaching": { "score": <1-4>, "notes": "<cite eval scores and student comment themes>" },\n' +
+    '    "service": { "score": <1-4>, "notes": "<cite specific service evidence or gaps>" },\n' +
+    '    "scholarship": { "score": <1-4 or 0>, "notes": "<N/A if Assistant; cite evidence if Associate/Full>" }\n' +
     '  },\n' +
     '  "criteria": [\n' +
-    '    { "name": "Connect with Students", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences citing eval evidence>" },\n' +
+    '    { "name": "Connect with Students", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
     '    { "name": "Course Presence & Participation", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
     '    { "name": "Industry Expertise Integration", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
-    '    { "name": "Grading, Feedback & Ownership", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences citing Q18/Q19 eval scores>" },\n' +
-    '    { "name": "Professional Development", "pillar": "service", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Grading & Feedback", "pillar": "teaching", "score": <1-4>, "rationale": "<cite Q18/Q19 eval scores if available>" },\n' +
+    '    { "name": "Course Stewardship & Reflective Practice", "pillar": "teaching", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
+    '    { "name": "Professional Development", "pillar": "service", "score": <1-4>, "rationale": "<cite number of PD activities mentioned>" },\n' +
     '    { "name": "Curriculum Contribution", "pillar": "service", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
-    '    { "name": "Industry Connections & Experiential Learning", "pillar": "service", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
-    '    { "name": "College & Program Engagement", "pillar": "service", "score": <1-4>, "rationale": "<1-2 sentences>" },\n' +
-    '    { "name": "Relevancy & Currency", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<1-2 sentences>" },\n' +
-    '    { "name": "Presentations & Publications", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<1-2 sentences>" },\n' +
-    '    { "name": "Research & Grant Activity", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<1-2 sentences>" }\n' +
+    '    { "name": "Industry Connections & Experiential Learning", "pillar": "service", "score": <1-4>, "rationale": "<cite specific experiential opportunities created>" },\n' +
+    '    { "name": "College & Program Engagement", "pillar": "service", "score": <1-4>, "rationale": "<cite committee or governance involvement>" },\n' +
+    '    { "name": "Relevancy & Currency", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A note if Assistant>" },\n' +
+    '    { "name": "Presentations & Publications", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A note if Assistant; cite specific outputs if Associate/Full>" },\n' +
+    '    { "name": "Research & Grant Activity", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A note if Assistant>" }\n' +
     '  ],\n' +
     '  "evalHighlights": {\n' +
     '    "overallQ3": <number or null>,\n' +
-    '    "trend": "up" or "down" or "stable",\n' +
-    '    "meetsThreshold": <true or false>,\n' +
-    '    "strengthThemes": "<1-2 sentence summary of recurring student praise>",\n' +
-    '    "improvementThemes": "<1-2 sentence summary of recurring student recommendations>"\n' +
+    '    "trend": "up"|"down"|"stable",\n' +
+    '    "meetsThreshold": <true|false>,\n' +
+    '    "strengthThemes": "<1-2 sentence summary from student comments>",\n' +
+    '    "improvementThemes": "<1-2 sentence summary from student comments>"\n' +
     '  },\n' +
-    '  "flags": ["<any concerns about missing info, industry engagement ambiguity, eval score issues, or contradictions between survey and eval data>"]\n' +
+    '  "flags": ["<specific missing evidence, unmet gates, or contradictions that affected this recommendation>"]\n' +
     '}';
 }
 
@@ -1862,7 +1972,7 @@ function runAIAssessment(idx) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
+      max_tokens: 2500,
       messages: [{ role: 'user', content: prompt }]
     })
   })
@@ -1943,8 +2053,35 @@ function renderAssessment(el, r, idx) {
   });
   html += '</div>';
 
-  // Eval highlights from AI
-  var eh = r.evalHighlights;
+  // Hard gates checklist
+  var gates = r.gatesAssessment;
+  if (gates) {
+    html += '<div class="ai-section-title">Hard Gate Checklist</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">';
+    var gateItems = [
+      { key: 'evalScoreMeetsThreshold', label: 'Eval Score Threshold' },
+      { key: 'activeIndustryEngagement', label: 'Active Industry Engagement' },
+      { key: 'experientialLearningEvidence', label: 'Experiential Learning Opportunity' },
+      { key: 'committeeEngagement', label: 'Committee / Governance' },
+      { key: 'presentationOrPublication', label: 'Presentation or Publication' }
+    ];
+    gateItems.forEach(function(g) {
+      var val = gates[g.key];
+      var icon = val === true ? '&#10003;' : val === false ? '&#10007;' : '?';
+      var color = val === true ? 'var(--green)' : val === false ? 'var(--crimson)' : 'var(--amber)';
+      var bg = val === true ? 'var(--green-bg)' : val === false ? '#fff0f1' : 'var(--amber-bg)';
+      html += '<div style="background:' + bg + ';border:1px solid ' + color + ';border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;color:' + color + '">' +
+        icon + ' ' + esc(g.label) + '</div>';
+    });
+    // PD requirement separately since it's a string
+    if (gates.pdRequirementMet) {
+      var pdOk = gates.pdRequirementMet !== 'unknown';
+      var pdColor = pdOk ? 'var(--green)' : 'var(--amber)';
+      var pdBg = pdOk ? 'var(--green-bg)' : 'var(--amber-bg)';
+      html += '<div style="background:' + pdBg + ';border:1px solid ' + pdColor + ';border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;color:' + pdColor + '">PD: ' + esc(gates.pdRequirementMet) + '</div>';
+    }
+    html += '</div>';
+  }
   var criteria = r.criteria || [];
   if (eh) {
     var thresholdMet = eh.meetsThreshold;
