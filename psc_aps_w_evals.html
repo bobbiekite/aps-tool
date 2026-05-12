@@ -1250,7 +1250,7 @@ function onEvals(evt) {
         var workbook = XLSX.read(data, { type: 'array' });
         var sheetName = workbook.SheetNames[0];
         var sheet = workbook.Sheets[sheetName];
-        rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+        rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
       } else {
         var parsed = parseCSV(e.target.result);
         if (parsed.length < 2) { showError('Eval file appears empty.'); return; }
@@ -1272,8 +1272,13 @@ function onEvals(evt) {
       S.evalByDUID = {};
 
       rows.forEach(function(obj) {
-        var did = String(obj['DU ID'] || '').trim();
-        if (!did || did === 'DU ID') return;
+        // Normalize DU ID — handle integer, float, or string from XLSX
+        var rawDUID = obj['DU ID'];
+        var did = rawDUID !== undefined && rawDUID !== null && rawDUID !== ''
+          ? String(parseInt(rawDUID, 10)).trim()
+          : '';
+        if (!did || did === 'NaN' || did === 'DU ID') return;
+        obj['_did'] = did; // store normalized version
         S.evalRows.push(obj);
         if (!S.evalByDUID[did]) S.evalByDUID[did] = [];
         S.evalByDUID[did].push(obj);
@@ -1329,6 +1334,7 @@ function termLabel(t) {
 
 // ── BUILD EVAL SUMMARY FOR INSTRUCTOR ──
 function buildEvalSummary(duid) {
+  duid = String(parseInt(duid, 10) || '').trim();
   var rows = S.evalByDUID[duid] || [];
   if (!rows.length) return null;
 
@@ -1527,7 +1533,7 @@ function renderEvals(el, duid, idx) {
 function synthesizeComments(idx) {
   var row = S.rows[idx];
   if (!row) return;
-  var duid = (row['DU ID'] || '').trim();
+  var duid = String(parseInt((row['DU ID'] || '0'), 10) || '').trim();
   var ev = buildEvalSummary(duid);
   if (!ev) return;
 
@@ -1760,7 +1766,7 @@ function switchTab(tab) {
 // ── BUILD ASSESSMENT PROMPT ──
 function buildPrompt(row) {
   var name = ((row['RecipientFirstName'] || '') + ' ' + (row['RecipientLastName'] || '')).trim();
-  var duid = (row['DU ID'] || '').trim();
+  var duid = String(parseInt((row['DU ID'] || '0'), 10) || '').trim();
 
   var surveyText = '';
   QCOLS.forEach(function(q) {
