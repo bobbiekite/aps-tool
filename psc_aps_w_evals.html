@@ -550,6 +550,7 @@ tbody tr:hover > td { background: #faf9f7; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
@@ -2326,19 +2327,18 @@ function buildWordDoc(idx) {
     :(r.recommendedRank||'').toLowerCase().indexOf('associate')>=0?'associate':'assistant';
   var rankColor = rankKey==='full'?'276b43':rankKey==='associate'?'996600':'1a4d7a';
   var crimson = '8B1A2B';
-
   var D = docx;
 
-  function heading(text, level) {
+  function heading(text) {
     return new D.Paragraph({
-      children: [new D.TextRun({ text: text, bold: true, size: level===1?28:24, color: crimson, font: 'Arial' })],
-      spacing: { before: level===1?240:180, after: 120 }
+      children: [new D.TextRun({ text: text, bold: true, size: 24, color: crimson, font: 'Arial' })],
+      spacing: { before: 240, after: 100 }
     });
   }
   function para(text, opts) {
     opts = opts || {};
     return new D.Paragraph({
-      children: [new D.TextRun({ text: String(text||''), size: opts.size||22, bold: opts.bold||false, color: opts.color||'000000', font: 'Arial', italics: opts.italics||false })],
+      children: [new D.TextRun({ text: String(text||''), size: opts.size||22, bold: opts.bold||false, color: opts.color||'333333', font: 'Arial', italics: opts.italics||false })],
       spacing: { before: opts.before||60, after: opts.after||60 }
     });
   }
@@ -2346,7 +2346,7 @@ function buildWordDoc(idx) {
     return new D.Paragraph({
       children: [
         new D.TextRun({ text: label + ': ', bold: true, size: 20, font: 'Arial', color: '444444' }),
-        new D.TextRun({ text: String(value||'—'), size: 20, font: 'Arial', color: '000000' })
+        new D.TextRun({ text: String(value||'—'), size: 20, font: 'Arial', color: '222222' })
       ],
       spacing: { before: 40, after: 40 }
     });
@@ -2354,97 +2354,68 @@ function buildWordDoc(idx) {
   function divider() {
     return new D.Paragraph({
       border: { bottom: { style: D.BorderStyle.SINGLE, size: 4, color: 'e0e0e0', space: 1 } },
-      spacing: { before: 120, after: 120 }
+      spacing: { before: 100, after: 100 }
     });
   }
 
+  // Score label helper
+  function scoreLabel(sc) {
+    sc = parseInt(sc) || 0;
+    if (sc === 4) return { text: '4 — Exceeds', color: '276b43' };
+    if (sc === 3) return { text: '3 — Meets', color: '1a4d7a' };
+    if (sc === 2) return { text: '2 — Needs Improvement', color: '996600' };
+    if (sc === 1) return { text: '1 — Unsatisfactory', color: '8B1A2B' };
+    return { text: 'N/A', color: '999999' };
+  }
+
+  // Build criteria blocks by pillar (matching HTML layout)
+  var criteriaBlocks = [];
+  var pillarDefs = [
+    { key: 'teaching', label: 'Teaching Excellence' },
+    { key: 'service', label: 'Service' },
+    { key: 'scholarship', label: 'Scholarship & Creative Activity' }
+  ];
   var border = { style: D.BorderStyle.SINGLE, size: 1, color: 'DDDDDD' };
   var borders = { top: border, bottom: border, left: border, right: border };
   var cellMargins = { top: 80, bottom: 80, left: 120, right: 120 };
 
-  function scoreCell(val, width) {
-    var sc = parseInt(val)||0;
-    var color = sc===4?'276b43':sc===3?'1a4d7a':sc===2?'996600':sc===1?'8B1A2B':'666666';
-    var label = sc===4?'4 — Exceeds':sc===3?'3 — Meets':sc===2?'2 — Needs Impr.':sc===1?'1 — Unsatisfactory':'N/A';
-    return new D.TableCell({
-      borders, margins: cellMargins,
-      width: { size: width, type: D.WidthType.DXA },
-      children: [new D.Paragraph({ children: [new D.TextRun({ text: label, bold: true, size: 18, color: color, font: 'Arial' })] })]
-    });
-  }
-
-  // Build criteria table
-  var criteriaRows = [
-    new D.TableRow({
-      tableHeader: true,
-      children: [
-        new D.TableCell({ borders, margins: cellMargins, width: { size: 3600, type: D.WidthType.DXA }, shading: { fill: 'F2F1EF', type: D.ShadingType.CLEAR },
-          children: [new D.Paragraph({ children: [new D.TextRun({ text: 'Criterion', bold: true, size: 18, font: 'Arial', color: crimson })] })] }),
-        new D.TableCell({ borders, margins: cellMargins, width: { size: 1800, type: D.WidthType.DXA }, shading: { fill: 'F2F1EF', type: D.ShadingType.CLEAR },
-          children: [new D.Paragraph({ children: [new D.TextRun({ text: 'Rating', bold: true, size: 18, font: 'Arial', color: crimson })] })] }),
-        new D.TableCell({ borders, margins: cellMargins, width: { size: 3960, type: D.WidthType.DXA }, shading: { fill: 'F2F1EF', type: D.ShadingType.CLEAR },
-          children: [new D.Paragraph({ children: [new D.TextRun({ text: 'Rationale', bold: true, size: 18, font: 'Arial', color: crimson })] })] })
-      ]
-    })
-  ];
-
-  var pillarLabels = { teaching: 'Teaching Excellence', service: 'Service', scholarship: 'Scholarship' };
-  var lastPillar = '';
-  (r.criteria||[]).forEach(function(c) {
-    if (c.pillar !== lastPillar) {
-      criteriaRows.push(new D.TableRow({
-        children: [
-          new D.TableCell({ borders, margins: cellMargins, columnSpan: 3,
-            width: { size: 9360, type: D.WidthType.DXA },
-            shading: { fill: 'FDF5F6', type: D.ShadingType.CLEAR },
-            children: [new D.Paragraph({ children: [new D.TextRun({ text: pillarLabels[c.pillar]||c.pillar, bold: true, size: 19, color: crimson, font: 'Arial' })] })]
-          })
-        ]
+  pillarDefs.forEach(function(p) {
+    var crits = (r.criteria||[]).filter(function(c) { return c.pillar === p.key; });
+    if (!crits.length) return;
+    criteriaBlocks.push(new D.Paragraph({
+      children: [new D.TextRun({ text: p.label, bold: true, size: 22, color: crimson, font: 'Arial' })],
+      spacing: { before: 160, after: 80 }
+    }));
+    crits.forEach(function(c) {
+      var sl = scoreLabel(c.score);
+      criteriaBlocks.push(new D.Table({
+        width: { size: 9360, type: D.WidthType.DXA },
+        columnWidths: [4680, 4680],
+        rows: [new D.TableRow({
+          children: [
+            new D.TableCell({
+              borders, margins: cellMargins,
+              width: { size: 4680, type: D.WidthType.DXA },
+              children: [
+                new D.Paragraph({ children: [new D.TextRun({ text: c.name||'', bold: true, size: 20, font: 'Arial' })] }),
+                new D.Paragraph({ children: [new D.TextRun({ text: c.rationale||'', size: 19, font: 'Arial', color: '555555', italics: true })] })
+              ]
+            }),
+            new D.TableCell({
+              borders, margins: cellMargins,
+              width: { size: 4680, type: D.WidthType.DXA },
+              shading: { fill: 'F9F8F6', type: D.ShadingType.CLEAR },
+              children: [new D.Paragraph({ children: [new D.TextRun({ text: sl.text, bold: true, size: 20, font: 'Arial', color: sl.color })] })]
+            })
+          ]
+        })]
       }));
-      lastPillar = c.pillar;
-    }
-    criteriaRows.push(new D.TableRow({
-      children: [
-        new D.TableCell({ borders, margins: cellMargins, width: { size: 3600, type: D.WidthType.DXA },
-          children: [new D.Paragraph({ children: [new D.TextRun({ text: c.name||'', size: 19, font: 'Arial' })] })] }),
-        scoreCell(c.score, 1800),
-        new D.TableCell({ borders, margins: cellMargins, width: { size: 3960, type: D.WidthType.DXA },
-          children: [new D.Paragraph({ children: [new D.TextRun({ text: c.rationale||'', size: 18, font: 'Arial', color: '444444', italics: true })] })] })
-      ]
-    }));
+      criteriaBlocks.push(new D.Paragraph({ spacing: { before: 60, after: 0 } }));
+    });
   });
-
-  // Gates checklist
-  var gatesChildren = [];
-  var gates = r.gatesAssessment || {};
-  var gateItems = [
-    { key: 'evalScoreMeetsThreshold', label: 'Eval Score Threshold Met' },
-    { key: 'activeIndustryEngagement', label: 'Active Industry Engagement' },
-    { key: 'experientialLearningEvidence', label: 'Experiential Learning Opportunity' },
-    { key: 'committeeEngagement', label: 'Committee / Governance Participation' },
-    { key: 'presentationOrPublication', label: 'Presentation or Publication' }
-  ];
-  gateItems.forEach(function(g) {
-    var val = gates[g.key];
-    var icon = val===true?'[YES]':val===false?'[NO]':'[?]';
-    var color = val===true?'276b43':val===false?'8B1A2B':'996600';
-    gatesChildren.push(new D.Paragraph({
-      children: [
-        new D.TextRun({ text: icon + ' ', bold: true, size: 20, color: color, font: 'Arial' }),
-        new D.TextRun({ text: g.label, size: 20, font: 'Arial' })
-      ],
-      spacing: { before: 40, after: 40 }
-    }));
-  });
-  if (gates.pdRequirementMet) {
-    gatesChildren.push(new D.Paragraph({
-      children: [new D.TextRun({ text: '[PD] ' + gates.pdRequirementMet, bold: true, size: 20, font: 'Arial', color: '1a4d7a' })],
-      spacing: { before: 40, after: 40 }
-    }));
-  }
 
   // Flags
-  var flagChildren = (r.flags||[]).filter(Boolean).map(function(f) {
+  var flagBlocks = (r.flags||[]).filter(Boolean).map(function(f) {
     return new D.Paragraph({
       children: [new D.TextRun({ text: '\u26A0 ' + f, size: 20, font: 'Arial', color: '996600' })],
       spacing: { before: 40, after: 40 }
@@ -2452,20 +2423,119 @@ function buildWordDoc(idx) {
   });
 
   // Eval highlights
-  var ehChildren = [];
+  var evalBlocks = [];
   var eh = r.evalHighlights;
   if (eh) {
-    ehChildren.push(labelValue('Overall Q3 Score', eh.overallQ3 ? Number(eh.overallQ3).toFixed(2)+'/6' : 'N/A'));
-    ehChildren.push(labelValue('Score Threshold Met', eh.meetsThreshold ? 'Yes' : 'No'));
-    ehChildren.push(labelValue('Trend', eh.trend||''));
-    if (eh.strengthThemes) ehChildren.push(labelValue('Student Praise Themes', eh.strengthThemes));
-    if (eh.improvementThemes) ehChildren.push(labelValue('Student Improvement Themes', eh.improvementThemes));
+    if (eh.overallQ3) evalBlocks.push(labelValue('Overall Effectiveness (Q3)', Number(eh.overallQ3).toFixed(2) + '/6 — ' + (eh.meetsThreshold ? 'Meets threshold' : 'Below threshold') + ' — Trend: ' + (eh.trend||'')));
+    if (eh.strengthThemes) evalBlocks.push(labelValue('Student Praise Themes', eh.strengthThemes));
+    if (eh.improvementThemes) evalBlocks.push(labelValue('Student Improvement Themes', eh.improvementThemes));
   }
 
-  var doc = new D.Document({
-    styles: {
-      default: { document: { run: { font: 'Arial', size: 22 } } }
-    },
+  var children = [
+    // Header
+    new D.Paragraph({
+      children: [new D.TextRun({ text: 'PSC Adjunct Professorial Series  \u2014  Initial Appointment AI Assessment', size: 20, color: 'ffffff', font: 'Arial' })],
+      shading: { fill: crimson, type: D.ShadingType.CLEAR },
+      spacing: { before: 0, after: 0 },
+      indent: { left: 120, right: 120 }
+    }),
+    new D.Paragraph({ spacing: { before: 0, after: 180 } }),
+
+    // Candidate name
+    new D.Paragraph({
+      children: [new D.TextRun({ text: nameStr, bold: true, size: 40, font: 'Arial', color: '1a1a1a' })],
+      spacing: { before: 0, after: 60 }
+    }),
+    labelValue('DU Email', email),
+    labelValue('Submitted', dateStr),
+    labelValue('Response ID', rid),
+    labelValue('Assessment Generated', todayStr),
+    divider(),
+
+    // Rank recommendation
+    heading('Preliminary Rank Recommendation'),
+    new D.Paragraph({
+      children: [new D.TextRun({ text: r.recommendedRank||'', bold: true, size: 32, font: 'Arial', color: rankColor })],
+      spacing: { before: 60, after: 40 }
+    }),
+    new D.Paragraph({
+      children: [new D.TextRun({ text: 'Confidence: ' + (r.confidence||0) + '%', bold: true, size: 20, font: 'Arial', color: '666666' })],
+      spacing: { before: 0, after: 100 }
+    }),
+    para(r.summary||'', { italics: true, color: '444444' }),
+    divider(),
+
+    // Pillar scores
+    heading('Pillar Scores'),
+  ];
+
+  // Add three pillar cards inline
+  var pillars = r.pillars || {};
+  var pillarDefs2 = [
+    { key: 'teaching', label: 'Teaching Excellence', weight: '70%' },
+    { key: 'service', label: 'Service', weight: '20%' },
+    { key: 'scholarship', label: 'Scholarship', weight: '10%' }
+  ];
+  pillarDefs2.forEach(function(p) {
+    var pd = pillars[p.key] || {};
+    var sc = pd.score || 0;
+    var sl = scoreLabel(sc);
+    children.push(new D.Paragraph({
+      children: [
+        new D.TextRun({ text: p.label + ' (' + p.weight + ')  ', bold: true, size: 22, font: 'Arial', color: crimson }),
+        new D.TextRun({ text: sl.text, bold: true, size: 22, font: 'Arial', color: sl.color })
+      ],
+      spacing: { before: 80, after: 40 }
+    }));
+    if (pd.notes) children.push(para(pd.notes, { italics: true, color: '555555', before: 0, after: 80 }));
+  });
+
+  children.push(divider());
+  children.push(heading('Criteria Detail'));
+  criteriaBlocks.forEach(function(b) { children.push(b); });
+  children.push(divider());
+
+  if (evalBlocks.length) {
+    children.push(heading('Evaluation Data Summary'));
+    evalBlocks.forEach(function(b) { children.push(b); });
+    children.push(divider());
+  }
+
+  if (flagBlocks.length) {
+    children.push(heading('Flags & Gaps'));
+    flagBlocks.forEach(function(b) { children.push(b); });
+    children.push(divider());
+  }
+
+  // Evaluator decision
+  children.push(heading('Evaluator Decision'));
+  ['Rank Confirmed', 'Rank Advancement', 'Support Plan', 'Rank Adjusted', 'Non-Reappointment'].forEach(function(opt) {
+    children.push(new D.Paragraph({
+      children: [new D.TextRun({ text: '\u2610  ' + opt, size: 22, font: 'Arial' })],
+      spacing: { before: 60, after: 60 }
+    }));
+  });
+  children.push(new D.Paragraph({ spacing: { before: 160, after: 60 } }));
+  children.push(para('Evaluator Comments:', { bold: true }));
+  for (var i = 0; i < 3; i++) {
+    children.push(new D.Paragraph({
+      border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
+      spacing: { before: 240, after: 0 }
+    }));
+  }
+  children.push(new D.Paragraph({ spacing: { before: 160, after: 60 } }));
+  children.push(para('Faculty Response / Comments:', { bold: true }));
+  for (var j = 0; j < 3; j++) {
+    children.push(new D.Paragraph({
+      border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
+      spacing: { before: 240, after: 0 }
+    }));
+  }
+  children.push(new D.Paragraph({ spacing: { before: 180, after: 0 } }));
+  children.push(para('This is a preliminary AI-assisted assessment based on survey responses and evaluation data. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.', { italics: true, color: '999999', size: 18 }));
+
+  return new D.Document({
+    styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
     sections: [{
       properties: {
         page: {
@@ -2473,108 +2543,9 @@ function buildWordDoc(idx) {
           margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 }
         }
       },
-      children: [
-        // Title block
-        new D.Paragraph({
-          children: [new D.TextRun({ text: 'PSC Adjunct Professorial Series', size: 20, color: 'ffffff', font: 'Arial' })],
-          shading: { fill: crimson, type: D.ShadingType.CLEAR },
-          spacing: { before: 0, after: 0 },
-          indent: { left: 120, right: 120 }
-        }),
-        new D.Paragraph({
-          children: [new D.TextRun({ text: 'Initial Appointment — AI Assessment', size: 20, color: 'ffcccc', font: 'Arial' })],
-          shading: { fill: crimson, type: D.ShadingType.CLEAR },
-          spacing: { before: 0, after: 240 },
-          indent: { left: 120, right: 120 }
-        }),
-
-        // Candidate info
-        new D.Paragraph({
-          children: [new D.TextRun({ text: nameStr, bold: true, size: 36, font: 'Arial', color: '1a1a1a' })],
-          spacing: { before: 0, after: 80 }
-        }),
-        labelValue('DU Email', email),
-        labelValue('Submitted', dateStr),
-        labelValue('Response ID', rid),
-        labelValue('Assessment Generated', todayStr),
-        divider(),
-
-        // Recommendation
-        heading('Preliminary Rank Recommendation', 1),
-        new D.Paragraph({
-          children: [new D.TextRun({ text: r.recommendedRank||'', bold: true, size: 30, font: 'Arial', color: rankColor })],
-          spacing: { before: 60, after: 60 }
-        }),
-        new D.Paragraph({
-          children: [new D.TextRun({ text: 'Confidence: ' + (r.confidence||0) + '%', size: 20, font: 'Arial', color: '666666', bold: true })],
-          spacing: { before: 0, after: 120 }
-        }),
-        para(r.summary||'', { italics: true, color: '444444' }),
-        divider(),
-
-        // Hard gates
-        heading('Hard Gate Assessment', 1)
-      ].concat(gatesChildren).concat([
-        divider(),
-
-        // Pillar scores
-        heading('Pillar Scores', 1),
-        labelValue('Teaching Excellence (70%)', 'Score: ' + ((r.pillars&&r.pillars.teaching)?r.pillars.teaching.score:'N/A') + '/4'),
-        para((r.pillars&&r.pillars.teaching&&r.pillars.teaching.notes)||'', { color: '444444', italics: true }),
-        labelValue('Service (20%)', 'Score: ' + ((r.pillars&&r.pillars.service)?r.pillars.service.score:'N/A') + '/4'),
-        para((r.pillars&&r.pillars.service&&r.pillars.service.notes)||'', { color: '444444', italics: true }),
-        labelValue('Scholarship (10%)', 'Score: ' + ((r.pillars&&r.pillars.scholarship)?r.pillars.scholarship.score:'N/A') + '/4'),
-        para((r.pillars&&r.pillars.scholarship&&r.pillars.scholarship.notes)||'', { color: '444444', italics: true }),
-        divider(),
-
-        // Criteria table
-        heading('Rubric Criteria Detail', 1),
-        new D.Table({
-          width: { size: 9360, type: D.WidthType.DXA },
-          columnWidths: [3600, 1800, 3960],
-          rows: criteriaRows
-        }),
-        new D.Paragraph({ spacing: { before: 240, after: 0 } }),
-        divider()
-      ]).concat(
-        ehChildren.length ? [heading('Evaluation Data Summary', 1)].concat(ehChildren).concat([divider()]) : []
-      ).concat(
-        flagChildren.length ? [heading('Flags & Gaps', 1)].concat(flagChildren).concat([divider()]) : []
-      ).concat([
-        // Evaluator section
-        heading('Evaluator Decision', 1),
-        labelValue('Rank Confirmed', '  '),
-        labelValue('Rank Advancement', '  '),
-        labelValue('Support Plan', '  '),
-        labelValue('Rank Adjusted', '  '),
-        labelValue('Non-Reappointment', '  '),
-        new D.Paragraph({ spacing: { before: 240, after: 60 } }),
-        para('Evaluator Comments:', { bold: true }),
-        new D.Paragraph({
-          border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
-          spacing: { before: 200, after: 200 }
-        }),
-        new D.Paragraph({
-          border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
-          spacing: { before: 200, after: 200 }
-        }),
-        new D.Paragraph({ spacing: { before: 240, after: 60 } }),
-        para('Faculty Response / Comments:', { bold: true }),
-        new D.Paragraph({
-          border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
-          spacing: { before: 200, after: 200 }
-        }),
-        new D.Paragraph({
-          border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
-          spacing: { before: 200, after: 200 }
-        }),
-        new D.Paragraph({ spacing: { before: 240, after: 0 } }),
-        para('This is a preliminary AI-assisted assessment based on survey responses and evaluation data. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.', { italics: true, color: '999999', size: 18 })
-      ])
+      children: children
     }]
   });
-
-  return doc;
 }
 
 // ── DOWNLOAD SINGLE WORD DOC ──
@@ -2604,20 +2575,20 @@ function downloadWordDoc(idx) {
   });
 }
 
-// ── DOWNLOAD ALL WORD DOCS INDIVIDUALLY ──
+// ── DOWNLOAD ALL WORD DOCS AS ZIP ──
 function downloadAllWordDocs() {
   var assessed = S.rows.filter(function(r) { return r._aiResult; });
   if (!assessed.length) { alert('No assessed candidates. Run batch assessments first.'); return; }
 
   var btn = document.getElementById('exportWordBtn');
   btn.disabled = true;
-  btn.textContent = 'Generating...';
+  btn.textContent = 'Building...';
 
   var today = new Date();
   var dateForFile = (today.getMonth()+1) + '-' + today.getDate() + '-' + today.getFullYear();
+  var zip = new JSZip();
+  var promises = [];
 
-  // Pre-build all docs first, then download them all in one synchronous pass
-  var pending = [];
   S.rows.forEach(function(row, idx) {
     if (!row._aiResult) return;
     var first = row['RecipientFirstName'] || '';
@@ -2625,35 +2596,27 @@ function downloadAllWordDocs() {
     var filename = 'PSC_Appointment_' + (last||'Unknown') + '_' + (first||'') + '_' + dateForFile + '.docx';
     filename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '');
     var doc = buildWordDoc(idx);
-    if (doc) pending.push({ doc: doc, filename: filename });
+    if (!doc) return;
+    var p = docx.Packer.toBlob(doc).then(function(blob) {
+      return blob.arrayBuffer().then(function(buf) { zip.file(filename, buf); });
+    });
+    promises.push(p);
   });
 
-  if (!pending.length) { btn.disabled = false; btn.textContent = 'Download All as Word'; return; }
-
-  // Convert all to blobs in parallel, then trigger downloads
-  btn.textContent = 'Building ' + pending.length + ' docs...';
-  var blobPromises = pending.map(function(p) {
-    return docx.Packer.toBlob(p.doc).then(function(blob) {
-      return { blob: blob, filename: p.filename };
-    });
-  });
-
-  Promise.all(blobPromises).then(function(results) {
-    // Trigger all downloads synchronously in one pass — Chrome allows this from a resolved Promise
-    results.forEach(function(r) {
-      var url = URL.createObjectURL(r.blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = r.filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
+  Promise.all(promises).then(function() {
+    btn.textContent = 'Zipping...';
+    return zip.generateAsync({ type: 'blob' });
+  }).then(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'PSC_APS_Assessments_' + dateForFile + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     btn.disabled = false;
     btn.textContent = 'Download All as Word';
   }).catch(function(err) {
-    alert('Download failed: ' + err.message);
+    alert('Failed: ' + err.message);
     btn.disabled = false;
     btn.textContent = 'Download All as Word';
   });
