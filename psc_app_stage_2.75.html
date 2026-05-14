@@ -1220,8 +1220,9 @@ function runBatchAssessments() {
         var result = JSON.parse(text);
         S.rows[idx]._aiResult = result;
 
-        var rankKey = (result.recommendedRank || '').toLowerCase().indexOf('full') >= 0 ? 'full'
-          : (result.recommendedRank || '').toLowerCase().indexOf('associate') >= 0 ? 'associate'
+        var _rr1 = (result.recommendedRank || '').toLowerCase();
+        var rankKey = (_rr1.indexOf('associate') < 0 && _rr1.indexOf('assistant') < 0 && _rr1.indexOf('professor') >= 0) ? 'full'
+          : _rr1.indexOf('associate') >= 0 ? 'associate'
           : 'assistant';
         counts[rankKey]++;
 
@@ -2106,8 +2107,9 @@ function runAIAssessment(idx) {
 
 // ── RENDER ASSESSMENT RESULT ──
 function renderAssessment(el, r, idx) {
-  var rankKey = (r.recommendedRank || '').toLowerCase().indexOf('full') >= 0 ? 'full'
-    : (r.recommendedRank || '').toLowerCase().indexOf('associate') >= 0 ? 'associate'
+  var _rr2 = (r.recommendedRank || '').toLowerCase();
+  var rankKey = (_rr2.indexOf('associate') < 0 && _rr2.indexOf('assistant') < 0 && _rr2.indexOf('professor') >= 0) ? 'full'
+    : _rr2.indexOf('associate') >= 0 ? 'associate'
     : 'assistant';
 
   var rankLabel = r.recommendedRank || 'Adjunct Assistant Professor';
@@ -2272,7 +2274,8 @@ function downloadAssessment() {
   var dateStr = '';
   if (recorded) { try { var d = new Date(recorded); dateStr = (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); } catch(e){} }
 
-  var rankKey = (r.recommendedRank||'').toLowerCase().indexOf('full')>=0?'full'
+  var _rrx = (r.recommendedRank||'').toLowerCase();
+  var rankKey = (_rrx.indexOf('associate')<0&&_rrx.indexOf('assistant')<0&&_rrx.indexOf('professor')>=0)?'full'
     :(r.recommendedRank||'').toLowerCase().indexOf('associate')>=0?'associate':'assistant';
   var rankColor = rankKey==='full'?'#276b43':rankKey==='associate'?'#996600':'#1a4d7a';
 
@@ -2416,7 +2419,8 @@ function buildWordDoc(idx) {
   if (recorded) { try { var d = new Date(recorded); dateStr = (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); } catch(e) {} }
   var today = new Date(); var todayStr = (today.getMonth()+1)+'/'+today.getDate()+'/'+today.getFullYear();
 
-  var rankKey = (r.recommendedRank||'').toLowerCase().indexOf('full')>=0?'full'
+  var _rrx = (r.recommendedRank||'').toLowerCase();
+  var rankKey = (_rrx.indexOf('associate')<0&&_rrx.indexOf('assistant')<0&&_rrx.indexOf('professor')>=0)?'full'
     :(r.recommendedRank||'').toLowerCase().indexOf('associate')>=0?'associate':'assistant';
   var rankColor = rankKey==='full'?'276b43':rankKey==='associate'?'996600':'1a4d7a';
   var crimson = '8B1A2B';
