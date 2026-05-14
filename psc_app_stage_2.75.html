@@ -1229,7 +1229,8 @@ function runBatchAssessments() {
         if (badgeEl) {
           var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
           var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
-          badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>';
+          var s3tag = result.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">S3</span>' : '';
+          badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>' + s3tag;
         }
       })
       .catch(function() {
@@ -1864,116 +1865,127 @@ function buildPrompt(row) {
 
   return 'You are an expert faculty evaluator for the University of Denver College of Professional Studies (PSC), performing an INITIAL rank assessment for the Adjunct Professorial Series (APS).\n\n' +
 
-    'You have three data sources: (1) self-reported survey responses, (2) course evaluation scores and pre-computed student comment synthesis, and (3) the candidate\'s CV provided as a PDF document. Read the CV carefully — it is the authoritative source for industry credentials, publication record, grant history, and professional network evidence.\n\n' +
+    'DATA SOURCES: You have (1) self-reported survey responses, (2) course evaluation scores and pre-computed student comment synthesis, and (3) the candidate\'s CV as a PDF document. Read the CV carefully — it is the authoritative source for industry credentials, scholarship, and professional network evidence.\n\n' +
 
     'CRITICAL INSTRUCTIONS:\n' +
-    '- This is an INITIAL appointment. Calibrate accordingly — see notes per criterion below.\n' +
-    '- Start at Assistant and only promote if there is clear evidence meeting criteria for the higher rank.\n' +
-    '- DO NOT flag low student evaluation response rates — instructors have zero control over this.\n' +
-    '- DO NOT penalize Service or Scholarship based on absence of student comment — students do not observe those dimensions.\n' +
-    '- Scholarship criteria are explicitly N/A for Assistant rank — do not score or penalize.\n' +
-    '- College & Program Engagement: no one will have PSC committee work at initial appointment. For Full, treat as confirming signal only, not a blocking gate.\n\n' +
+    '- This is an INITIAL appointment. No one has had the opportunity to do PSC committee work, formal curriculum process steps, or CoP participation yet.\n' +
+    '- Start at Assistant and only move up when there is clear evidence meeting the criteria for the higher rank.\n' +
+    '- NEVER flag low student evaluation response rates — instructors have zero control over this.\n' +
+    '- NEVER penalize Service or Scholarship based on absence of student comments in those areas.\n' +
+    '- Scholarship criteria (Presentations/Publications and Research/Grant) are N/A ONLY when recommending Assistant rank. If recommending Associate or Full, score all scholarship criteria.\n' +
+    '- These are adjunct faculty whose primary identity is as industry professionals, not academics. Scholarship includes industry research, applied research, white papers, keynotes, patents, grant work, and practitioner publications — not only peer-reviewed academic journals.\n' +
+    '- CV evidence outweighs self-reported survey answers. If the survey says something the CV does not corroborate, flag the discrepancy rather than accepting the claim.\n' +
+    '- College & Program Engagement: treat as a confirming signal for Full at initial appointment, not a blocking criterion. Check CV for external leadership roles (professional organizations, editorial boards, advisory groups).\n\n' +
+
+    'CONFIDENCE CALIBRATION — be honest, not uniformly high:\n' +
+    '- 85-90%: Evidence is clear and unambiguous in both directions. Criteria clearly met or clearly not met.\n' +
+    '- 70-80%: Most criteria are clear but 1-2 are borderline or unverified.\n' +
+    '- 55-70%: Genuinely borderline — candidate could reasonably go either way. Flag for human review and Stage 3 clarification.\n' +
+    '- Below 55%: Significant evidence gaps. Do not guess — stay at lower rank and flag what is missing.\n\n' +
 
     'RATING SCALE: 4=Exceeds, 3=Meets, 2=Needs Improvement, 1=Unsatisfactory, N/A=Not Applicable\n' +
     'RUBRIC WEIGHTS: Teaching Excellence 70%, Service 20%, Scholarship 10%\n\n' +
 
     '═══ TEACHING EXCELLENCE (70%) ═══\n\n' +
 
-    'CRITERION 1 — Connect with Students (Communication, Community, Mentoring)\n' +
+    'CRITERION 1 — Connect with Students\n' +
     '  Data: Survey Q9/Q14/Q35, Eval Q19/Q20, Synthesis teaching themes\n' +
     '  Assistant: Responsive communication; builds basic community\n' +
-    '  Associate: Proactive, intentional communication; mentors students; facilitates peer connections\n' +
+    '  Associate: Proactive, intentional; anticipates student needs; mentors students; facilitates peer connections\n' +
     '  Full: Models exemplary communication; cultivates learning community; deep sustained mentoring\n' +
-    '  Initial appt note: Trust self-report. LMS login data not available yet.\n\n' +
+    '  Note: Trust self-report at initial appointment. LMS data not yet available.\n\n' +
 
-    'CRITERION 2 — Be Present (Course Access & Participation)\n' +
+    'CRITERION 2 — Be Present\n' +
     '  Data: Survey Q9/Q10, Eval Q13/Q20, Synthesis themes on presence\n' +
-    '  Assistant: Logs in at least every 3 days; avg 4 interactions/week; varied instructional approaches\n' +
+    '  Assistant: Regular presence; responds and participates; varied instructional approaches\n' +
     '  Associate: Consistent proactive presence; initiates/enriches discussions; innovative pedagogy\n' +
-    '  Full: Sustained exemplary presence; models and elevates discourse; champions innovative practice\n' +
-    '  Initial appt note: Login frequency not available. Use Eval Q20 and survey self-report.\n\n' +
+    '  Full: Sustained exemplary presence; models and elevates discourse\n' +
+    '  Note: Login frequency not available at initial appointment. Use Eval Q20 and survey.\n\n' +
 
-    'CRITERION 3 — Bring Industry Expertise (Eval Score + Professional Background)\n' +
-    '  Data: Survey Q5/Q6/Q12/Q23, Eval Q3 (threshold)/Q14/Q15/Q17, CV (current role/credentials/recognition)\n' +
+    'CRITERION 3 — Bring Industry Expertise\n' +
+    '  Data: Survey Q5/Q6/Q12/Q23, Eval Q3 (threshold)/Q14/Q15, CV (role/credentials/recognition)\n' +
     '  Assistant: Eval Q3 >= 4.5; integrates professional background into instruction\n' +
-    '  Associate: Eval Q3 >= 5.0; actively leverages industry connections to enrich class and student experience\n' +
-    '  Full: Eval Q3 >= 5.0 consistently across terms; strategically leverages broad network to substantially enhance programming\n' +
-    '  Initial appt note: CV is PRIMARY source for verifying active industry engagement and credentials. Eval Q3 is a threshold signal, not a sole determinant. Do NOT flag low response rates.\n\n' +
+    '  Associate: Eval Q3 >= 5.0; actively leverages industry connections to enrich student experience\n' +
+    '  Full: Eval Q3 >= 5.0 consistently; strategically leverages broad network to substantially enhance programming\n' +
+    '  Note: CV is PRIMARY source for industry engagement verification. Eval Q3 is a threshold signal, not sole determinant. Do NOT flag low response rates.\n\n' +
 
-    'CRITERION 4 — Take Ownership (Grading/Feedback + Course Stewardship + Reflective Practice)\n' +
-    '  Data: Survey Q13/Q15/Q16/Q17, Eval Q18 (timeliness)/Q19 (quality), Synthesis themes on feedback\n' +
+    'CRITERION 4 — Take Ownership\n' +
+    '  Data: Survey Q13/Q15/Q16/Q17, Eval Q18 (timeliness)/Q19 (quality), Synthesis feedback themes\n' +
     '  Assistant: Feedback within 6 days; keeps course current; open to feedback\n' +
-    '  Associate: Feedback connects to learning outcomes; proactively updates content; engages in peer observation\n' +
-    '  Full: Forward-looking feedback; exemplary course quality; models continuous improvement culture\n' +
-    '  Initial appt note: Eval Q18/Q19 are objective evidence. Course stewardship is self-reported but corroborated by student comments on organization.\n\n' +
+    '  Associate: Feedback connects to learning outcomes; proactively updates content; reflects and adapts\n' +
+    '  Full: Forward-looking feedback; exemplary course quality; models continuous improvement\n\n' +
 
     '═══ SERVICE (20%) ═══\n\n' +
 
     'CRITERION 5 — Professional Development\n' +
-    '  Data: Survey Q9/Q17, CV (certifications/training/conferences)\n' +
-    '  Assistant: At least 1 PD training or upskilling opportunity per cycle\n' +
-    '  Associate: At least 2 PD trainings per cycle; contributes ideas for needed trainings\n' +
-    '  Full: Multiple PD trainings; contributes to and leads PD initiatives\n' +
-    '  Initial appt note: Be lenient. Count any PD activity mentioned in survey or CV. Both formal PSC PD and professional development in field count.\n\n' +
+    '  Data: Survey Q9/Q17, CV (certifications/training/conferences/professional memberships)\n' +
+    '  Assistant: At least 1 PD or upskilling opportunity per cycle\n' +
+    '  Associate: At least 2 PD activities per cycle; contributes ideas for needed trainings\n' +
+    '  Full: Multiple PD activities; contributes to and leads PD initiatives\n' +
+    '  Note: Count any professional development — certifications, conferences, workshops, executive education, professional org involvement. Be lenient at initial appointment.\n\n' +
 
     'CRITERION 6 — Curriculum Contribution\n' +
-    '  Data: Survey Q13/Q20, CV (curriculum design experience)\n' +
-    '  Assistant: Identifies and makes minor course updates (readings, materials)\n' +
+    '  Data: Survey Q13/Q20, CV (curriculum/course design experience)\n' +
+    '  Assistant: Identifies and makes minor course updates\n' +
     '  Associate: Completes course updates or curriculum modifications on assigned courses\n' +
-    '  Full: Completes course updates or curriculum modifications on programs and/or assigned courses\n' +
-    '  Initial appt note: Full kickoff/plan/report process NOT required — no one has had the opportunity. Look for evidence of course-level updates for Assoc; program-level contributions for Full.\n\n' +
+    '  Full: Contributes to program-level curriculum work across courses\n' +
+    '  Note: Full formal process steps (kickoff/plan/report) not required at initial appointment.\n\n' +
 
     'CRITERION 7 — Industry Connections & Experiential Learning\n' +
-    '  Data: Survey Q21/Q23/Q33, Eval Q5/Q6, Synthesis themes, CV (industry network/affiliations)\n' +
+    '  Data: Survey Q21/Q23/Q33, Eval Q5/Q6, CV (industry network/affiliations/partnerships)\n' +
     '  Assistant: Maintains active industry connections relevant to teaching area\n' +
-    '  Associate: Maintains and grows connections; creates at least 1 experiential learning opportunity per cycle (guest speaker, site visit, internship, project partnership)\n' +
-    '  Full: Sustains broad active network; consistently creates and expands experiential learning; documented impact on student career outcomes\n' +
-    '  Initial appt note: Be lenient. For Assoc, look for at least 1 documented opportunity OR strong active network with clear intent. "Documented impact on student career outcomes" not required at initial appt.\n\n' +
+    '  Associate: Grows connections; creates at least 1 experiential learning opportunity (guest speaker, site visit, internship, project partnership)\n' +
+    '  Full: Broad active network; consistently creates and expands opportunities; impact on student careers\n' +
+    '  Note: Be lenient at initial appointment. For Associate, 1 documented opportunity or strong network with clear intent is sufficient.\n\n' +
 
     'CRITERION 8 — College & Program Engagement\n' +
-    '  Data: Survey Q19/Q20/Q21, CV (committee memberships/professional org roles)\n' +
-    '  Assistant: Aware of PSC initiatives; attends/watches program/college meetings\n' +
+    '  Data: Survey Q19/Q20/Q21, CV (committee memberships/professional org leadership roles)\n' +
+    '  Assistant: Aware of PSC initiatives; attends or watches program/college meeting recordings\n' +
     '  Associate: Participates on at least 1 curriculum committee, industry advisory group, or governance body\n' +
-    '  Full: Leads curriculum committee; leadership in professional organizations, editorial boards, conference planning, or college governance\n' +
-    '  Initial appt note: No one will have PSC committee work yet. For Assoc, any committee participation (inside or outside PSC) counts. For Full, if ALL other Full criteria are clearly met, treat this as a confirming signal rather than a blocking gate — check CV for external leadership roles.\n\n' +
+    '  Full: Leads curriculum committee or holds leadership roles in professional organizations, editorial boards, conference planning, or college governance\n' +
+    '  Note: No PSC committee work expected at initial appointment. For Associate, any external committee counts. For Full, check CV for external leadership — this is a confirming signal, not a blocking criterion.\n\n' +
 
-    '═══ SCHOLARSHIP (10%) — N/A AT ASSISTANT RANK ═══\n\n' +
+    '═══ SCHOLARSHIP (10%) ═══\n' +
+    'IMPORTANT: Scholarship is N/A ONLY if recommending Assistant rank. Score all three scholarship criteria for Associate and Full candidates.\n' +
+    'These are industry professionals, not traditional academics. Count ALL of the following as valid scholarship:\n' +
+    '  - Industry research and applied research projects\n' +
+    '  - White papers, technical reports, practitioner publications\n' +
+    '  - Conference presentations, keynote addresses, invited talks\n' +
+    '  - Patents and intellectual property\n' +
+    '  - Grant applications, funding received, or grant support provided\n' +
+    '  - Peer review activities (journal, conference, grant)\n' +
+    '  - Book chapters, co-authored works, anthology contributions\n' +
+    '  - Textbooks in progress count as active scholarship\n\n' +
 
     'CRITERION 9 — Relevancy & Currency\n' +
-    '  Data: Survey Q26/Q27/Q23, CV (publication dates, conference recency, professional currency)\n' +
-    '  N/A at Assistant. For Assoc/Full: CV is primary source. Survey is corroborating.\n\n' +
+    '  Data: Survey Q26/Q27/Q23, CV (recency of work, emerging trends engagement)\n' +
+    '  N/A if Assistant. Associate: bridges field knowledge and classroom practice; engages emerging trends. Full: recognized expertise; contributes to advancing knowledge.\n\n' +
 
     'CRITERION 10 — Presentations & Publications\n' +
-    '  Data: Survey Q26, CV (full publication list with dates, conference presentations, invited talks, patents)\n' +
-    '  N/A at Assistant. For Assoc: at least 1 presentation or publication per cycle. For Full: multiple, with regional/national recognition.\n' +
-    '  Initial appt note: CV is the AUTHORITATIVE source. Survey self-report is often incomplete. You MUST read the CV to score this accurately.\n\n' +
+    '  Data: Survey Q26, CV (full list with dates — presentations, publications, talks, patents, books)\n' +
+    '  N/A if Assistant. Associate: at least 1 presentation OR publication per cycle. Full: multiple per cycle; regional or national recognition.\n' +
+    '  Note: CV is AUTHORITATIVE. Survey is often incomplete. Read the CV.\n\n' +
 
     'CRITERION 11 — Research & Grant Activity\n' +
-    '  Data: Survey Q27/Q28, CV (grant history, funded research, reviewer roles, industry research)\n' +
-    '  N/A at Assistant. For Assoc: conducts or contributes to industry research. For Full: leads research; active grants.\n' +
-    '  Initial appt note: CV is the AUTHORITATIVE source.\n\n' +
+    '  Data: Survey Q27/Q28, CV (grant history, funded research, reviewer roles, applied research)\n' +
+    '  N/A if Assistant. Associate: conducts or contributes to industry research; evidence of grant activity or application. Full: leads or publishes recognized research; actively pursues grants.\n' +
+    '  Note: CV is AUTHORITATIVE. Industry research, applied research, and grant support all count.\n\n' +
 
     '═══ CANDIDATE DATA ═══\n\n' +
     'CANDIDATE: ' + name + '\n\n' +
-    'SURVEY RESPONSES (self-reported):\n' + surveyText + '\n\n' +
+    'SURVEY RESPONSES (self-reported — weight less heavily than CV for scholarship and industry evidence):\n' + surveyText + '\n\n' +
     evalText + '\n\n' +
 
-    'NOTE: The candidate\'s CV is attached as a PDF document. Read it carefully for:\n' +
-    '- Current role, employer, and years of industry experience (Criterion 3, 7)\n' +
-    '- Certifications, licenses, professional credentials (Criterion 3)\n' +
-    '- Publication list with dates (Criterion 10)\n' +
-    '- Conference presentations and invited talks (Criterion 10)\n' +
-    '- Grant history and funded research (Criterion 11)\n' +
-    '- Committee memberships and professional organization roles (Criterion 8)\n' +
-    '- Any curriculum or course development work listed (Criterion 6)\n\n' +
+    'The candidate\'s CV is attached as a PDF. Read it for: current role and employer, years of industry experience, certifications, full publication/presentation/patent list with dates, grant history, committee memberships, and professional organization leadership.\n\n' +
 
     'Respond ONLY with valid JSON, no markdown:\n' +
     '{\n' +
     '  "recommendedRank": "Adjunct Assistant Professor" or "Adjunct Associate Professor" or "Adjunct Professor",\n' +
-    '  "confidence": <integer 1-100>,\n' +
+    '  "confidence": <integer 1-100 — calibrate honestly; borderline cases should be 55-70%>,\n' +
     '  "summary": "<2-3 sentences citing specific evidence from survey, eval data, AND CV>",\n' +
+    '  "whyThisRank": "<2-3 sentences explicitly stating which criteria were met at the recommended rank AND what the candidate would need to demonstrate to advance to the next rank>",\n' +
     '  "cvReadConfirmed": <true if CV was available and read, false if no CV>,\n' +
-    '  "gatesAssessment": {\n' +
+    '  "rankThresholds": {\n' +
     '    "evalScoreMeetsThreshold": <true|false|null>,\n' +
     '    "activeIndustryEngagement": <true|false|null>,\n' +
     '    "pdRequirementMet": "1+"|"2+"|"unknown",\n' +
@@ -1984,30 +1996,31 @@ function buildPrompt(row) {
     '  "pillars": {\n' +
     '    "teaching": { "score": <1-4>, "notes": "<cite eval scores, CV evidence, and student comment themes>" },\n' +
     '    "service": { "score": <1-4>, "notes": "<cite specific service evidence from survey and CV>" },\n' +
-    '    "scholarship": { "score": <1-4 or 0 if N/A>, "notes": "<N/A if Assistant; cite CV evidence if Associate/Full>" }\n' +
+    '    "scholarship": { "score": <1-4 or 0 if N/A>, "notes": "<N/A only if recommending Assistant; otherwise score and cite CV evidence>" }\n' +
     '  },\n' +
     '  "criteria": [\n' +
     '    { "name": "Connect with Students", "pillar": "teaching", "score": <1-4>, "rationale": "<cite survey Q9/Q14 and eval Q19/Q20>" },\n' +
-    '    { "name": "Be Present", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q13/Q20 and survey presence descriptions>" },\n' +
-    '    { "name": "Bring Industry Expertise", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q3 score, CV role/credentials, survey Q12>" },\n' +
-    '    { "name": "Take Ownership", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q18/Q19 scores and survey Q15/Q16/Q17>" },\n' +
+    '    { "name": "Be Present", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q13/Q20 and survey>" },\n' +
+    '    { "name": "Bring Industry Expertise", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q3 score and CV role/credentials>" },\n' +
+    '    { "name": "Take Ownership", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q18/Q19 scores>" },\n' +
     '    { "name": "Professional Development", "pillar": "service", "score": <1-4>, "rationale": "<count specific PD activities from survey and CV>" },\n' +
-    '    { "name": "Curriculum Contribution", "pillar": "service", "score": <1-4>, "rationale": "<cite survey Q13 and CV curriculum work>" },\n' +
-    '    { "name": "Industry Connections & Experiential Learning", "pillar": "service", "score": <1-4>, "rationale": "<cite specific opportunities from survey Q21 and CV network>" },\n' +
-    '    { "name": "College & Program Engagement", "pillar": "service", "score": <1-4>, "rationale": "<cite committee/governance from survey Q19 and CV; note initial appt context>" },\n' +
-    '    { "name": "Relevancy & Currency", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A if Assistant; cite CV publication dates and professional currency>" },\n' +
-    '    { "name": "Presentations & Publications", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A if Assistant; cite specific CV entries with dates>" },\n' +
-    '    { "name": "Research & Grant Activity", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A if Assistant; cite CV grant history and research roles>" }\n' +
+    '    { "name": "Curriculum Contribution", "pillar": "service", "score": <1-4>, "rationale": "<cite survey Q13 and CV>" },\n' +
+    '    { "name": "Industry Connections & Experiential Learning", "pillar": "service", "score": <1-4>, "rationale": "<cite specific opportunities from survey Q21 and CV>" },\n' +
+    '    { "name": "College & Program Engagement", "pillar": "service", "score": <1-4>, "rationale": "<cite survey Q19 and CV; note initial appt context>" },\n' +
+    '    { "name": "Relevancy & Currency", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A only if Assistant; otherwise cite CV>" },\n' +
+    '    { "name": "Presentations & Publications", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A only if Assistant; otherwise cite specific CV entries>" },\n' +
+    '    { "name": "Research & Grant Activity", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A only if Assistant; otherwise cite CV grant history and research>" }\n' +
     '  ],\n' +
-    '  "cvHighlights": "<2-3 sentence summary of the most relevant CV evidence that informed this recommendation>",\n' +
+    '  "cvHighlights": "<2-3 sentences on the most relevant CV evidence>",\n' +
     '  "evalHighlights": {\n' +
     '    "overallQ3": <number or null>,\n' +
     '    "trend": "up"|"down"|"stable",\n' +
     '    "meetsThreshold": <true|false>,\n' +
-    '    "strengthThemes": "<1-2 sentence summary from student comments>",\n' +
-    '    "improvementThemes": "<1-2 sentence summary from student comments>"\n' +
+    '    "strengthThemes": "<1-2 sentence summary>",\n' +
+    '    "improvementThemes": "<1-2 sentence summary>"\n' +
     '  },\n' +
-    '  "flags": ["<specific missing evidence, unmet gates, or contradictions — do NOT flag low response rates>"]\n' +
+    '  "flags": ["<missing evidence, discrepancies between survey and CV, declining eval trend, or other concerns — do NOT flag low response rates>"],\n' +
+    '  "stage3Recommended": <true if confidence is below 75% or candidate is borderline between ranks, false otherwise>\n' +
     '}';
 }
 
@@ -2121,7 +2134,8 @@ function renderAssessment(el, r, idx) {
   if (badgeEl) {
     var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
     var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
-    badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>';
+    var s3tag = r.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">S3</span>' : '';
+    badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>' + s3tag;
   }
 
   var html = '';
@@ -2132,6 +2146,7 @@ function renderAssessment(el, r, idx) {
       '<div class="ai-rec-label">Preliminary Rank Recommendation</div>' +
       '<div class="ai-rec-rank">' + esc(rankLabel) + '</div>' +
       '<div class="ai-rec-summary" style="margin-top:8px">' + esc(summary) + '</div>' +
+      (r.whyThisRank ? '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,0.08);font-size:12px;color:var(--ink-mid);line-height:1.55"><strong>Why this rank:</strong> ' + esc(r.whyThisRank) + '</div>' : '') +
     '</div>' +
     '<div class="ai-confidence">' +
       '<div class="conf-n">' + conf + '%</div>' +
@@ -2163,9 +2178,9 @@ function renderAssessment(el, r, idx) {
   html += '</div>';
 
   // Hard gates checklist
-  var gates = r.gatesAssessment;
+  var gates = r.rankThresholds || r.gatesAssessment;
   if (gates) {
-    html += '<div class="ai-section-title">Hard Gate Checklist</div>';
+    html += '<div class="ai-section-title">Rank Threshold Summary</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">';
     var gateItems = [
       { key: 'evalScoreMeetsThreshold', label: 'Eval Score Threshold' },
@@ -2345,7 +2360,7 @@ function downloadAssessment() {
     '<div style="display:flex;gap:12px;margin-bottom:20px">' + pillarHTML + '</div>' +
     (flagsHTML ? '<h3 style="font-size:13px;font-weight:600;color:#8B1A2B;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.08em">Flags &amp; Gaps</h3>' + flagsHTML : '') +
     critHTML +
-    '<div style="font-size:11px;color:#999;font-style:italic;margin-top:20px;padding:12px;background:#f9f8f6;border-radius:6px;line-height:1.55">This is a preliminary AI-assisted assessment based on survey responses only. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.</div>' +
+    '<div style="font-size:11px;color:#999;font-style:italic;margin-top:20px;padding:12px;background:#f9f8f6;border-radius:6px;line-height:1.55">This is a preliminary AI-assisted assessment based on survey responses, course evaluation data, and CV review. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.</div>' +
     '<div style="font-size:10px;color:#bbb;margin-top:12px">Generated ' + new Date().toLocaleDateString() + ' &mdash; PSC Adjunct Professorial Series</div>' +
     '</body></html>';
 
@@ -2567,6 +2582,13 @@ function buildWordDoc(idx) {
       spacing: { before: 0, after: 100 }
     }),
     para(r.summary||'', { italics: true, color: '444444' }),
+    (r.whyThisRank ? new D.Paragraph({
+      children: [
+        new D.TextRun({ text: 'Why this rank: ', bold: true, size: 20, font: 'Arial', color: '333333' }),
+        new D.TextRun({ text: r.whyThisRank, size: 20, font: 'Arial', color: '555555', italics: true })
+      ],
+      spacing: { before: 80, after: 100 }
+    }) : new D.Paragraph({ spacing: { before: 0, after: 0 } })),
     divider(),
 
     // Pillar scores
@@ -2642,7 +2664,7 @@ function buildWordDoc(idx) {
     }));
   }
   children.push(new D.Paragraph({ spacing: { before: 180, after: 0 } }));
-  children.push(para('This is a preliminary AI-assisted assessment based on survey responses and evaluation data. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.', { italics: true, color: '999999', size: 18 }));
+  children.push(para('This is a preliminary AI-assisted assessment based on survey responses, course evaluation data, and CV review. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.', { italics: true, color: '999999', size: 18 }));
 
   return new D.Document({
     styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
