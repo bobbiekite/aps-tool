@@ -1943,7 +1943,7 @@ function buildPrompt(row) {
     '  Assistant: Eval Q3 >= 4.5; integrates professional background into instruction\n' +
     '  Associate: Eval Q3 >= 5.0; actively leverages industry connections to enrich student experience\n' +
     '  Full: Eval Q3 >= 5.0 consistently; strategically leverages broad network to substantially enhance programming\n' +
-    '  Note: CV is PRIMARY source for industry engagement verification. Eval Q3 is a threshold signal, not sole determinant. Do NOT flag low response rates.\n\n' +
+    '  Note: CV is PRIMARY source for industry engagement verification. Eval Q3 is a threshold signal, not sole determinant. Do NOT flag low response rates. For Full rank eval consideration, a strong recent trend (last 2-4 terms) matters more than a lower all-time average that includes older terms.\n\n' +
 
     'CRITERION 4 — Take Ownership\n' +
     '  Data: Survey Q13/Q15/Q16/Q17, Eval Q18 (timeliness)/Q19 (quality), Synthesis feedback themes\n' +
@@ -1979,7 +1979,7 @@ function buildPrompt(row) {
     '  Assistant: Aware of PSC initiatives; attends or watches program/college meeting recordings\n' +
     '  Associate: Participates on at least 1 curriculum committee, industry advisory group, or governance body\n' +
     '  Full: Leads curriculum committee or holds leadership roles in professional organizations, editorial boards, conference planning, or college governance\n' +
-    '  Note: No PSC committee work expected at initial appointment. For Associate, any external committee counts. For Full, check CV for external leadership — this is a confirming signal, not a blocking criterion.\n\n' +
+    '  Note: No PSC committee work expected at initial appointment. For Associate, any external committee counts. For Full, check CV for external leadership — this is a confirming signal, not a blocking criterion. Active participation on MULTIPLE PSC committees (e.g. Curriculum Committee + Faculty Review Committee + program committee) at initial appointment is exceptional and confirms Full-level engagement.\n\n' +
 
     '═══ SCHOLARSHIP (10%) ═══\n' +
     'IMPORTANT: Scholarship is N/A ONLY if recommending Assistant rank. Score all three criteria for Associate and Full.\n\n' +
@@ -2001,9 +2001,25 @@ function buildPrompt(row) {
     'CRITERION 11 — Research & Grant Activity\n' +
     '  Data: Survey Q27/Q28, CV (grant history, funded research, reviewer roles, applied/industry research, editorial work)\n' +
     '  N/A if Assistant. Associate: conducts or contributes to research or applied work in their field. Full: leads or publishes recognized work; sustained research contribution.\n' +
-    '  CRITICAL: Grants are NOT required in all fields. For CREATIVE WRITING: score this criterion based on editorial leadership, literary advocacy, mentoring emerging writers, anthology curation, sustained creative output — a state Poet Laureate with 40 years of publication history scores 4 on this criterion. For CONSULTING: applied client research, industry studies, practitioner frameworks count. Do NOT score 1 or 2 simply because no grant funding exists — evaluate knowledge-creation in THEIR field.\n\n' +
+    '  CRITICAL: Grants are NOT required in all fields. Field-specific equivalents:\n' +
+    '  - CREATIVE WRITING: A poet\'s published books ARE their industry research. Each published collection represents original creative research and contribution to the field. Editorial roles, anthology curation, and literary criticism are applied research. A poet with 25+ books and a state laureateship has led and published industry-recognized research at the highest level — score 4.\n' +
+    '  - CONSULTING: Applied client engagements, industry frameworks, white papers are research contributions.\n' +
+    '  - HEALTHCARE/SCIENCE: Grants, funded studies, peer-reviewed research are standard.\n' +
+    '  Never score this criterion 1 or 2 for a candidate with an active, sustained publication record in their field simply because no grant funding appears.\n\n' +
 
     '═══ CANDIDATE DATA ═══\n\n' +
+    'BEFORE SCORING: Identify the candidate\'s primary professional field from their CV and survey. Then apply the correct scholarship lens:\n' +
+    '  IF the candidate is a CREATIVE WRITING / LITERARY professional (poet, novelist, playwright, literary editor):\n' +
+    '    - Their books, collections, and publications ARE their research output\n' +
+    '    - Criterion 11 (Research & Grant Activity): score based on sustained creative output, editorial roles, and literary community contribution — NOT grant funding. A poet laureate with 40 years of continuous publication should score 3 or 4 on this criterion.\n' +
+    '    - Multiple published books per year = exceeds Full Professor scholarship requirements\n' +
+    '    - Do NOT require grants, do NOT score this criterion below 3 for an active publishing poet\n' +
+    '  IF the candidate is in CONSULTING, MANAGEMENT, or OPERATIONS:\n' +
+    '    - Keynotes, white papers, applied research, industry frameworks = valid scholarship\n' +
+    '    - Grants not expected unless they work in research-adjacent fields\n' +
+    '  IF the candidate is in TECHNICAL, SCIENTIFIC, or HEALTHCARE fields:\n' +
+    '    - Standard academic scholarship expectations apply\n' +
+    '    - Grants, peer-reviewed publications, and funded research are normal\n\n' +
     'CANDIDATE: ' + name + '\n\n' +
     'SURVEY RESPONSES (self-reported — weight less heavily than CV for scholarship and industry evidence):\n' + surveyText + '\n\n' +
     evalText + '\n\n' +
