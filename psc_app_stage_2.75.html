@@ -885,6 +885,25 @@ function updateUI() {
   }
 }
 
+// ── CHECK MINIMUM SURVEY DATA FOR ASSESSMENT ──
+// Teaching core: Q9, Q10, Q12, Q13 — at least 2 must have substantive answers
+// Service core: Q22, Q23 — at least 1 must have a substantive answer
+function hasMinimumSurveyData(row) {
+  var teachingQs = ['Q9', 'Q10', 'Q12', 'Q13'];
+  var serviceQs = ['Q22', 'Q23'];
+  var minLength = 20; // at least 20 chars = substantive answer
+
+  var teachingAnswered = teachingQs.filter(function(k) {
+    return (row[k] || '').trim().length >= minLength;
+  }).length;
+
+  var serviceAnswered = serviceQs.filter(function(k) {
+    return (row[k] || '').trim().length >= minLength;
+  }).length;
+
+  return teachingAnswered >= 2 && serviceAnswered >= 1;
+}
+
 function buildRoster() {
   if (!S.rows.length) return;
   hideError();
@@ -924,6 +943,9 @@ function buildRoster() {
 
     // Main row
     var tr = document.createElement('tr');
+    var hasSurveyData = hasMinimumSurveyData(row);
+    row._insufficientData = !hasSurveyData;
+
     tr.innerHTML =
       '<td>' +
         '<div class="td-name">' + esc(nameStr) + '</div>' +
@@ -944,7 +966,10 @@ function buildRoster() {
         : '<span class="badge b-grey">None</span>') +
       '</td>' +
       '<td class="td-id">' + esc(rid) + '</td>' +
-      '<td id="airecbadge-' + idx + '"><span class="badge b-grey" style="font-size:10px">Not run</span></td>' +
+      '<td id="airecbadge-' + idx + '">' + (!hasSurveyData
+        ? '<span class="badge b-grey" style="font-size:10px;color:var(--crimson)">Insufficient Data</span>'
+        : '<span class="badge b-grey" style="font-size:10px">Not run</span>') +
+      '</td>' +
       '<td style="white-space:nowrap;min-width:140px">' +
         '<button class="btn-expand" id="expbtn-' + idx + '" onclick="toggleDetail(' + idx + ')">View</button> ' +
         '<button class="btn-expand" onclick="openReview(' + idx + ')" style="background:var(--crimson-bg);border-color:var(--crimson);color:var(--crimson)">Review</button>' +
@@ -1193,6 +1218,16 @@ function runBatchAssessments() {
     var row = S.rows[idx];
     var prompt = buildPrompt(row);
     var badgeEl = document.getElementById('airecbadge-' + idx);
+
+    // Skip if insufficient survey data
+    if (row._insufficientData) {
+      if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px;color:var(--crimson)">Insufficient Data</span>';
+      completed++;
+      updateProgress();
+      setTimeout(function() { processNext(idx + 1); }, 100);
+      return;
+    }
+
     if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px">...</span>';
 
     var rid = row['ResponseId'] || '';
@@ -1220,10 +1255,11 @@ function runBatchAssessments() {
         var result = JSON.parse(text);
         S.rows[idx]._aiResult = result;
 
-        var _rr1 = (result.recommendedRank || '').toLowerCase();
+        var _rr1 = (result.recommendedRank || '').toLowerCase().trim();
         var rankKey = (_rr1.indexOf('associate') < 0 && _rr1.indexOf('assistant') < 0 && _rr1.indexOf('professor') >= 0) ? 'full'
           : _rr1.indexOf('associate') >= 0 ? 'associate'
           : 'assistant';
+        if (!_rr1) rankKey = 'assistant'; // explicit fallback for empty/null
         counts[rankKey]++;
 
         if (badgeEl) {
@@ -1946,16 +1982,15 @@ function buildPrompt(row) {
     '  Note: No PSC committee work expected at initial appointment. For Associate, any external committee counts. For Full, check CV for external leadership — this is a confirming signal, not a blocking criterion.\n\n' +
 
     '═══ SCHOLARSHIP (10%) ═══\n' +
-    'IMPORTANT: Scholarship is N/A ONLY if recommending Assistant rank. Score all three scholarship criteria for Associate and Full candidates.\n' +
-    'These are industry professionals, not traditional academics. Count ALL of the following as valid scholarship:\n' +
-    '  - Industry research and applied research projects\n' +
-    '  - White papers, technical reports, practitioner publications\n' +
-    '  - Conference presentations, keynote addresses, invited talks\n' +
-    '  - Patents and intellectual property\n' +
-    '  - Grant applications, funding received, or grant support provided\n' +
-    '  - Peer review activities (journal, conference, grant)\n' +
-    '  - Book chapters, co-authored works, anthology contributions\n' +
-    '  - Textbooks in progress count as active scholarship\n\n' +
+    'IMPORTANT: Scholarship is N/A ONLY if recommending Assistant rank. Score all three criteria for Associate and Full.\n\n' +
+    'CRITICAL — FIELD-SENSITIVE EVALUATION: These are industry professionals, not traditional academics. Scholarship must be evaluated relative to what is normal and recognized in the candidate\'s specific field:\n' +
+    '  - Creative fields (writing, arts, design): books, published works, performances, exhibitions, editorial roles, artist residencies, national recognition count as full scholarship\n' +
+    '  - Applied/practitioner fields (consulting, management, healthcare): white papers, keynotes, industry reports, applied research, practitioner publications, patents count fully\n' +
+    '  - Technical/scientific fields: peer-reviewed publications, conference papers, patents, grants are standard\n' +
+    '  - ALL fields: grant activity, funded research, invited talks, conference presentations, peer review roles, books/chapters in progress all count\n' +
+    '  - A published author with 25+ books has FAR exceeded scholarship requirements — do not penalize for absence of grants if grants are not normal in their field\n' +
+    '  - A consultant who keynotes national conferences and publishes industry research meets scholarship requirements even without academic journals\n' +
+    '  - For Research & Grant Activity: if no grants exist in the candidate\'s field type, evaluate this criterion on applied research, industry research, or N/A — do not score 1 or 2 simply because no grants are listed\n\n' +
 
     'CRITERION 9 — Relevancy & Currency\n' +
     '  Data: Survey Q26/Q27/Q23, CV (recency of work, emerging trends engagement)\n' +
@@ -2031,6 +2066,18 @@ function runAIAssessment(idx) {
 
   var aiEl = document.getElementById('ovAI');
   aiEl.dataset.idx = idx;
+
+  // Block assessment if insufficient survey data
+  if (row._insufficientData) {
+    aiEl.innerHTML =
+      '<div style="padding:30px;color:var(--crimson);font-size:13px">' +
+        '<strong>Assessment not available.</strong><br><br>' +
+        'This candidate did not provide sufficient answers to the core Teaching and Service questions. ' +
+        'Per APS policy, candidates missing responses to these sections cannot be assessed by the AI tool. ' +
+        'A human review or follow-up with the candidate is required.' +
+      '</div>';
+    return;
+  }
 
   // Use cached result if available
   if (row._aiResult) {
