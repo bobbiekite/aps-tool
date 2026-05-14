@@ -2244,7 +2244,7 @@ function runAIAssessment(idx) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 6000,
+        max_tokens: 8000,
         messages: [{ role: 'user', content: contentArray }]
       })
     })
@@ -2256,7 +2256,30 @@ function runAIAssessment(idx) {
         data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
       }
       text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
-      var result = JSON.parse(text);
+      // Repair truncated JSON: if the response was cut off, close any open structures
+      var result;
+      try {
+        result = JSON.parse(text);
+      } catch(parseErr) {
+        // Attempt recovery: truncate to last complete top-level field and close the object
+        var truncated = text;
+        // Remove any trailing incomplete string or value
+        truncated = truncated.replace(/,\s*"[^"]*$/, '');   // trailing incomplete key
+        truncated = truncated.replace(/:\s*"[^"]*$/, '');    // trailing incomplete string value
+        truncated = truncated.replace(/,\s*\{[^}]*$/, '');   // trailing incomplete nested object
+        truncated = truncated.replace(/,\s*\[[^\]]*$/, '');  // trailing incomplete array
+        // Close any open arrays then the root object
+        var openBrackets = (truncated.match(/\[/g)||[]).length - (truncated.match(/\]/g)||[]).length;
+        var openBraces   = (truncated.match(/\{/g)||[]).length - (truncated.match(/\}/g)||[]).length;
+        for (var ob = 0; ob < openBrackets; ob++) truncated += ']';
+        for (var oc = 0; oc < openBraces;   oc++) truncated += '}';
+        try {
+          result = JSON.parse(truncated);
+          result._truncated = true; // flag so we can note it in the UI
+        } catch(repairErr) {
+          throw new Error('JSON parse failed and repair unsuccessful. Original error: ' + parseErr.message + '. The response may be too long — try re-running.');
+        }
+      }
       row._aiResult = result;
       // Generate follow-up questions for borderline cases
       if (result.stage3Recommended) {
@@ -2451,6 +2474,9 @@ function renderAssessment(el, r, idx) {
 
   // Re-run button + disclaimer
   html += '<button class="btn-run-ai" style="margin-bottom:14px" onclick="S.rows[' + idx + ']._aiResult=null;runAIAssessment(' + idx + ')">Re-run Assessment</button>';
+  if (r._truncated) {
+    html += '<div style="background:#fff8e7;border:1px solid #e8c878;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#996600">&#9888; The AI response was truncated and partially recovered. Some criteria or flags at the end of the assessment may be incomplete. Re-running may produce a complete result.</div>';
+  }
   html += '<div class="ai-disclaimer">This is a preliminary AI-assisted assessment based on survey responses only. ' +
     'It does not replace human review, interviews, or the formal rubric evaluation. ' +
     'Associate and Full rank candidates should proceed to interview before rank is confirmed. ' +
