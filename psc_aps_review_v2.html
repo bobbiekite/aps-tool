@@ -1235,54 +1235,85 @@ function runBatchAssessments() {
 
     function sendBatchAssessment(contentArray) {
       contentArray.push({ type: 'text', text: prompt });
-      fetch('https://dark-credit-4434.bobbie-kite.workers.dev', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 6000,
-          messages: [{ role: 'user', content: contentArray }]
+
+      function attemptFetch(attemptsLeft) {
+        fetch('https://dark-credit-4434.bobbie-kite.workers.dev', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 8000,
+            messages: [{ role: 'user', content: contentArray }]
+          })
         })
-      })
-      .then(function(res) { return res.json(); })
-      .then(function(data) {
-        if (data.error) throw new Error('API: ' + (data.error.message || JSON.stringify(data.error)));
-        var text = '';
-        if (data.content && data.content.length) {
-          data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
-        }
-        text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
-        var result = JSON.parse(text);
-        S.rows[idx]._aiResult = result;
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.error) throw new Error('API: ' + (data.error.message || JSON.stringify(data.error)));
+          var text = '';
+          if (data.content && data.content.length) {
+            data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
+          }
+          text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
 
-        var _rr1 = (result.recommendedRank || '').toLowerCase().trim();
-        var rankKey = (_rr1.indexOf('associate') < 0 && _rr1.indexOf('assistant') < 0 && _rr1.indexOf('professor') >= 0) ? 'full'
-          : _rr1.indexOf('associate') >= 0 ? 'associate'
-          : 'assistant';
-        if (!_rr1) rankKey = 'assistant'; // explicit fallback for empty/null
-        counts[rankKey]++;
+          // JSON repair fallback for truncated responses
+          var result;
+          try {
+            result = JSON.parse(text);
+          } catch(parseErr) {
+            var truncated = text;
+            truncated = truncated.replace(/,\s*"[^"]*$/, '');
+            truncated = truncated.replace(/:\s*"[^"]*$/, '');
+            truncated = truncated.replace(/,\s*\{[^}]*$/, '');
+            truncated = truncated.replace(/,\s*\[[^\]]*$/, '');
+            var openBrackets = (truncated.match(/\[/g)||[]).length - (truncated.match(/\]/g)||[]).length;
+            var openBraces   = (truncated.match(/\{/g)||[]).length - (truncated.match(/\}/g)||[]).length;
+            for (var ob = 0; ob < openBrackets; ob++) truncated += ']';
+            for (var oc = 0; oc < openBraces;   oc++) truncated += '}';
+            result = JSON.parse(truncated);
+            result._truncated = true;
+          }
 
-        if (badgeEl) {
-          var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
-          var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
-          var s3tag = result.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">⚑ Review</span>' : '';
-          badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>' + s3tag;
-        }
+          S.rows[idx]._aiResult = result;
 
-        // Generate follow-up questions for borderline cases (fire and forget — cached on row)
-        if (result.stage3Recommended) {
-          generateFollowUpQuestions(idx, null);
-        }
-      })
-      .catch(function() {
-        counts.error++;
-        if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px;color:var(--crimson)">Error</span>';
-      })
-      .finally(function() {
-        completed++;
-        updateProgress();
-        setTimeout(function() { processNext(idx + 1); }, 300);
-      });
+          var _rr1 = (result.recommendedRank || '').toLowerCase().trim();
+          var rankKey = (_rr1.indexOf('associate') < 0 && _rr1.indexOf('assistant') < 0 && _rr1.indexOf('professor') >= 0) ? 'full'
+            : _rr1.indexOf('associate') >= 0 ? 'associate'
+            : 'assistant';
+          if (!_rr1) rankKey = 'assistant';
+          counts[rankKey]++;
+
+          if (badgeEl) {
+            var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
+            var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
+            var s3tag = result.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">⚑ Review</span>' : '';
+            badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>' + s3tag;
+          }
+
+          // Generate follow-up questions for borderline cases (fire and forget — cached on row)
+          if (result.stage3Recommended) {
+            generateFollowUpQuestions(idx, null);
+          }
+
+          completed++;
+          updateProgress();
+          // Wait 1.5s between candidates to avoid rate limiting
+          setTimeout(function() { processNext(idx + 1); }, 1500);
+        })
+        .catch(function(err) {
+          if (attemptsLeft > 0) {
+            // Retry once after a 5s pause (handles transient rate limits)
+            setTimeout(function() { attemptFetch(attemptsLeft - 1); }, 5000);
+          } else {
+            counts.error++;
+            if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px;color:var(--crimson)">Error</span>';
+            completed++;
+            updateProgress();
+            setTimeout(function() { processNext(idx + 1); }, 1500);
+          }
+        });
+      }
+
+      attemptFetch(1); // 1 retry on failure
     }
 
     if (cv && cv.url) {
@@ -2012,6 +2043,33 @@ function buildPrompt(row) {
 
     'DATA SOURCES: You have (1) self-reported survey responses, (2) course evaluation scores and pre-computed student comment synthesis, and (3) the candidate\'s CV as a PDF document. Read the CV carefully — it is the authoritative source for industry credentials, scholarship, and professional network evidence.\n\n' +
 
+    '═══ RANK DECISION RULES — READ AND APPLY BEFORE SCORING ═══\n\n' +
+
+    'BATCH INDEPENDENCE: You are evaluating ONE candidate. You have no knowledge of any other candidates in this cohort. Do not anchor, calibrate, or adjust your recommendation based on any prior assessment. Each candidate is evaluated entirely on their own evidence against the fixed rubric criteria below.\n\n' +
+
+    'DEFAULT TO ASSISTANT: Adjunct Assistant Professor is the correct starting rank. Only move up when there is clear, specific, documented evidence meeting the criteria for a higher rank. When evidence is ambiguous or absent, stay at the lower rank and flag the gap — do not give the benefit of the doubt upward.\n\n' +
+
+    'WHEN TO STAY AT ASSISTANT — recommend Assistant if ANY of the following are true:\n' +
+    '  - Eval Q3 is below 4.5 (or unavailable)\n' +
+    '  - Industry Connections & Experiential Learning (Criterion 7) scores 1 or 2\n' +
+    '  - No documented student-facing experiential learning opportunities (guest speakers arranged, site visits, internship connections, project partnerships)\n' +
+    '  - Service pillar overall scores 2 or below with no mitigating evidence\n' +
+    '  - Candidate is new to PSC with no track record of creating student value beyond direct instruction\n' +
+    'Strong scholarship or an impressive CV does NOT override a weak service floor. A brilliant industry expert who has not yet created value for PSC students beyond teaching their courses is an Assistant.\n\n' +
+
+    'WHEN TO STAY AT ASSOCIATE — recommend Associate (not Full) if ANY of the following are true:\n' +
+    '  - Experiential learning exists but is limited to one-off actions with no documented pattern or student career impact\n' +
+    '  - Industry network is described but not demonstrably leveraged for student benefit at scale\n' +
+    '  - Curriculum contribution is limited to individual assigned courses only\n' +
+    '  - No external leadership roles documented (editorial boards, professional org officer, advisory groups)\n' +
+    '  - Scholarship is solid but not consistently recognized at regional or national level\n\n' +
+
+    'SERVICE FLOOR — NON-NEGOTIABLE:\n' +
+    'Criterion 7 (Industry Connections & Experiential Learning) is the defining difference between Assistant and Associate.\n' +
+    '  - Criterion 7 scores 1 or 2 → recommendedRank MUST be Adjunct Assistant Professor. No exceptions.\n' +
+    '  - Criterion 7 scores 3 → Associate is eligible if other criteria support it.\n' +
+    '  - Criterion 7 scores 4 → Full is eligible if other criteria support it.\n\n' +
+
     'CRITICAL INSTRUCTIONS:\n' +
     '- This is an INITIAL appointment. No one has had the opportunity to do PSC committee work, formal curriculum process steps, or CoP participation yet.\n' +
     '- Start at Assistant and only move up when there is clear evidence meeting the criteria for the higher rank.\n' +
@@ -2115,35 +2173,6 @@ function buildPrompt(row) {
     '  - CONSULTING: Applied client engagements, industry frameworks, white papers are research contributions.\n' +
     '  - HEALTHCARE/SCIENCE: Grants, funded studies, peer-reviewed research are standard.\n' +
     '  Never score this criterion 1 or 2 for a candidate with an active, sustained publication record in their field simply because no grant funding appears.\n\n' +
-
-    '═══ RANK DECISION RULES — READ BEFORE SCORING ═══\n\n' +
-
-    'BATCH INDEPENDENCE: You are evaluating ONE candidate. You have no knowledge of any other candidates in this cohort. Do not anchor, calibrate, or adjust your recommendation based on any prior assessment. Each candidate is evaluated entirely on their own evidence against the fixed rubric criteria below.\n\n' +
-
-    'DEFAULT TO ASSISTANT: Adjunct Assistant Professor is the correct starting rank. Only move up when there is clear, specific, documented evidence meeting the criteria for a higher rank. When evidence is ambiguous or absent, stay at the lower rank and flag the gap — do not give the benefit of the doubt upward.\n\n' +
-
-    'WHEN TO STAY AT ASSISTANT — a candidate should be recommended Assistant if ANY of the following are true:\n' +
-    '  - Eval Q3 is below 4.5 (or unavailable)\n' +
-    '  - Survey data is thin or self-report cannot be corroborated by CV\n' +
-    '  - Industry Connections & Experiential Learning criterion scores 1 or 2 (no documented student-facing opportunities and no clear evidence of network being leveraged for students)\n' +
-    '  - Service pillar overall scores 2 or below with no mitigating evidence\n' +
-    '  - Candidate is new to PSC with no track record of creating student value beyond direct instruction\n' +
-    'Strong scholarship or a strong CV does NOT override a weak service floor. A brilliant industry expert who has not yet created value for PSC students beyond teaching their courses is an Assistant.\n\n' +
-
-    'WHEN TO STAY AT ASSOCIATE — a candidate should be recommended Associate (not Full) if ANY of the following are true:\n' +
-    '  - Experiential learning opportunities exist but are limited to individual one-off actions with no documented pattern or student career impact\n' +
-    '  - Industry network is described but not demonstrably leveraged for student benefit at scale\n' +
-    '  - Curriculum contribution is limited to individual assigned courses only\n' +
-    '  - No external leadership roles documented (editorial boards, professional org officer, advisory groups, conference planning)\n' +
-    '  - Scholarship is solid but not consistently recognized at regional or national level\n' +
-    'Associate is not a stepping stone to grant someone who looks impressive. It requires demonstrated service to students through experiential learning and a growing professional contribution to PSC.\n\n' +
-
-    'SERVICE FLOOR — NON-NEGOTIABLE:\n' +
-    'The Industry Connections & Experiential Learning criterion (Criterion 7) is the defining difference between Assistant and Associate. It cannot be overridden by strong scholarship or strong teaching scores.\n' +
-    '  - If Criterion 7 scores 1 or 2: recommendedRank MUST be Adjunct Assistant Professor. Period.\n' +
-    '  - If Criterion 7 scores 3 (Meets Associate threshold — at least 1 documented experiential opportunity): Associate is eligible if other criteria support it.\n' +
-    '  - If Criterion 7 scores 4 (Exceeds — broad network, consistent opportunities, documented student career impact): Full is eligible if other criteria support it.\n' +
-    'A candidate who has not yet created any documented experiential learning opportunity for PSC students is an Assistant, regardless of their external credentials, scholarship output, or teaching scores.\n\n' +
 
     '═══ CANDIDATE DATA ═══\n\n' +
     'HOLISTIC FULL RANK ASSESSMENT:\n' +
