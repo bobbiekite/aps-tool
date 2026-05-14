@@ -2116,6 +2116,35 @@ function buildPrompt(row) {
     '  - HEALTHCARE/SCIENCE: Grants, funded studies, peer-reviewed research are standard.\n' +
     '  Never score this criterion 1 or 2 for a candidate with an active, sustained publication record in their field simply because no grant funding appears.\n\n' +
 
+    '═══ RANK DECISION RULES — READ BEFORE SCORING ═══\n\n' +
+
+    'BATCH INDEPENDENCE: You are evaluating ONE candidate. You have no knowledge of any other candidates in this cohort. Do not anchor, calibrate, or adjust your recommendation based on any prior assessment. Each candidate is evaluated entirely on their own evidence against the fixed rubric criteria below.\n\n' +
+
+    'DEFAULT TO ASSISTANT: Adjunct Assistant Professor is the correct starting rank. Only move up when there is clear, specific, documented evidence meeting the criteria for a higher rank. When evidence is ambiguous or absent, stay at the lower rank and flag the gap — do not give the benefit of the doubt upward.\n\n' +
+
+    'WHEN TO STAY AT ASSISTANT — a candidate should be recommended Assistant if ANY of the following are true:\n' +
+    '  - Eval Q3 is below 4.5 (or unavailable)\n' +
+    '  - Survey data is thin or self-report cannot be corroborated by CV\n' +
+    '  - Industry Connections & Experiential Learning criterion scores 1 or 2 (no documented student-facing opportunities and no clear evidence of network being leveraged for students)\n' +
+    '  - Service pillar overall scores 2 or below with no mitigating evidence\n' +
+    '  - Candidate is new to PSC with no track record of creating student value beyond direct instruction\n' +
+    'Strong scholarship or a strong CV does NOT override a weak service floor. A brilliant industry expert who has not yet created value for PSC students beyond teaching their courses is an Assistant.\n\n' +
+
+    'WHEN TO STAY AT ASSOCIATE — a candidate should be recommended Associate (not Full) if ANY of the following are true:\n' +
+    '  - Experiential learning opportunities exist but are limited to individual one-off actions with no documented pattern or student career impact\n' +
+    '  - Industry network is described but not demonstrably leveraged for student benefit at scale\n' +
+    '  - Curriculum contribution is limited to individual assigned courses only\n' +
+    '  - No external leadership roles documented (editorial boards, professional org officer, advisory groups, conference planning)\n' +
+    '  - Scholarship is solid but not consistently recognized at regional or national level\n' +
+    'Associate is not a stepping stone to grant someone who looks impressive. It requires demonstrated service to students through experiential learning and a growing professional contribution to PSC.\n\n' +
+
+    'SERVICE FLOOR — NON-NEGOTIABLE:\n' +
+    'The Industry Connections & Experiential Learning criterion (Criterion 7) is the defining difference between Assistant and Associate. It cannot be overridden by strong scholarship or strong teaching scores.\n' +
+    '  - If Criterion 7 scores 1 or 2: recommendedRank MUST be Adjunct Assistant Professor. Period.\n' +
+    '  - If Criterion 7 scores 3 (Meets Associate threshold — at least 1 documented experiential opportunity): Associate is eligible if other criteria support it.\n' +
+    '  - If Criterion 7 scores 4 (Exceeds — broad network, consistent opportunities, documented student career impact): Full is eligible if other criteria support it.\n' +
+    'A candidate who has not yet created any documented experiential learning opportunity for PSC students is an Assistant, regardless of their external credentials, scholarship output, or teaching scores.\n\n' +
+
     '═══ CANDIDATE DATA ═══\n\n' +
     'HOLISTIC FULL RANK ASSESSMENT:\n' +
     'When a candidate demonstrates ALL of the following, recommend Full Professor regardless of minor sub-criterion gaps:\n' +
@@ -2123,7 +2152,7 @@ function buildPrompt(row) {
     '  2. Teaching eval Q3 >= 5.0 with improving or stable trend\n' +
     '  3. Active on multiple committees or holds external leadership roles (journal editor, professional org officer, etc.)\n' +
     '  4. Substantial curriculum contribution documented\n' +
-    '  5. Active industry network with documented student benefit\n' +
+    '  5. Criterion 7 scores 4 — broad network with consistent documented student-facing opportunities and career impact\n' +
     'A minor sub-criterion gap (e.g. Q18 feedback timeliness slightly below 5.0, or assignment clarity student feedback) does NOT prevent Full rank when the overall profile is exceptional. Full rank reflects WHO THE PERSON IS and what they bring — not whether every sub-criterion scores 4.\n\n' +
     '  IF the candidate is a CREATIVE WRITING / LITERARY professional (poet, novelist, playwright, literary editor):\n' +
     '    - Their books, collections, and publications ARE their research output\n' +
