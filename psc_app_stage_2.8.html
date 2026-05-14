@@ -1265,7 +1265,7 @@ function runBatchAssessments() {
         if (badgeEl) {
           var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
           var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
-          var s3tag = result.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">S3</span>' : '';
+          var s3tag = result.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">⚑ Review</span>' : '';
           badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>' + s3tag;
         }
       })
@@ -1983,28 +1983,25 @@ function buildPrompt(row) {
 
     '═══ SCHOLARSHIP (10%) ═══\n' +
     'IMPORTANT: Scholarship is N/A ONLY if recommending Assistant rank. Score all three criteria for Associate and Full.\n\n' +
-    'CRITICAL — FIELD-SENSITIVE EVALUATION: These are industry professionals, not traditional academics. Scholarship must be evaluated relative to what is normal and recognized in the candidate\'s specific field:\n' +
-    '  - Creative fields (writing, arts, design): books, published works, performances, exhibitions, editorial roles, artist residencies, national recognition count as full scholarship\n' +
-    '  - Applied/practitioner fields (consulting, management, healthcare): white papers, keynotes, industry reports, applied research, practitioner publications, patents count fully\n' +
-    '  - Technical/scientific fields: peer-reviewed publications, conference papers, patents, grants are standard\n' +
-    '  - ALL fields: grant activity, funded research, invited talks, conference presentations, peer review roles, books/chapters in progress all count\n' +
-    '  - A published author with 25+ books has FAR exceeded scholarship requirements — do not penalize for absence of grants if grants are not normal in their field\n' +
-    '  - A consultant who keynotes national conferences and publishes industry research meets scholarship requirements even without academic journals\n' +
-    '  - For Research & Grant Activity: if no grants exist in the candidate\'s field type, evaluate this criterion on applied research, industry research, or N/A — do not score 1 or 2 simply because no grants are listed\n\n' +
-
+    'CRITICAL — FIELD-SENSITIVE EVALUATION: Scholarship must be evaluated relative to what is normal in the candidate\'s specific discipline. Do NOT apply a single academic lens across all fields.\n\n' +
+    'FIELD EXAMPLES:\n' +
+    '  - CREATIVE WRITING/LITERARY ARTS: Published books, chapbooks, anthologies, literary journals, editorial roles, poet laureate appointments, literary awards. A poet with 25+ published books and a state Poet Laureate appointment has EXCEEDED Full Professor scholarship requirements. For Research & Grant Activity in this field — score based on sustained creative output, editorial leadership, literary advocacy, mentoring emerging writers. Do NOT score low simply because no grant funding exists. Poets do not have grants.\n' +
+    '  - CONSULTING/MANAGEMENT: Keynote presentations, industry white papers, practitioner publications, case study development, conference panels, applied research, thought leadership platforms.\n' +
+    '  - HEALTHCARE/PUBLIC HEALTH: Peer-reviewed publications, grants, applied research, policy work, clinical practice guidelines.\n' +
+    '  - TECHNICAL/ENGINEERING: Patents, conference papers, peer-reviewed publications, standards contributions, industry research.\n' +
+    '  - LEGAL/POLICY: Bar publications, policy briefs, legal commentary, continuing education contributions.\n\n' +
     'CRITERION 9 — Relevancy & Currency\n' +
     '  Data: Survey Q26/Q27/Q23, CV (recency of work, emerging trends engagement)\n' +
-    '  N/A if Assistant. Associate: bridges field knowledge and classroom practice; engages emerging trends. Full: recognized expertise; contributes to advancing knowledge.\n\n' +
-
+    '  N/A if Assistant. Associate: bridges field knowledge and classroom practice; engages with emerging trends. Full: recognized expertise in field; contributes to advancing knowledge.\n' +
+    '  Note: For creative/practitioner fields, recent publications, performances, or active professional roles demonstrate currency.\n\n' +
     'CRITERION 10 — Presentations & Publications\n' +
-    '  Data: Survey Q26, CV (full list with dates — presentations, publications, talks, patents, books)\n' +
+    '  Data: Survey Q26, CV (full list with dates — books, articles, talks, presentations, patents, keynotes, exhibitions)\n' +
     '  N/A if Assistant. Associate: at least 1 presentation OR publication per cycle. Full: multiple per cycle; regional or national recognition.\n' +
-    '  Note: CV is AUTHORITATIVE. Survey is often incomplete. Read the CV.\n\n' +
-
+    '  Note: CV is AUTHORITATIVE. For creative fields, books and literary publications ARE the publication record. A poet with 25+ books FAR exceeds Full requirements for this criterion.\n\n' +
     'CRITERION 11 — Research & Grant Activity\n' +
-    '  Data: Survey Q27/Q28, CV (grant history, funded research, reviewer roles, applied research)\n' +
-    '  N/A if Assistant. Associate: conducts or contributes to industry research; evidence of grant activity or application. Full: leads or publishes recognized research; actively pursues grants.\n' +
-    '  Note: CV is AUTHORITATIVE. Industry research, applied research, and grant support all count.\n\n' +
+    '  Data: Survey Q27/Q28, CV (grant history, funded research, reviewer roles, applied/industry research, editorial work)\n' +
+    '  N/A if Assistant. Associate: conducts or contributes to research or applied work in their field. Full: leads or publishes recognized work; sustained research contribution.\n' +
+    '  CRITICAL: Grants are NOT required in all fields. For CREATIVE WRITING: score this criterion based on editorial leadership, literary advocacy, mentoring emerging writers, anthology curation, sustained creative output — a state Poet Laureate with 40 years of publication history scores 4 on this criterion. For CONSULTING: applied client research, industry studies, practitioner frameworks count. Do NOT score 1 or 2 simply because no grant funding exists — evaluate knowledge-creation in THEIR field.\n\n' +
 
     '═══ CANDIDATE DATA ═══\n\n' +
     'CANDIDATE: ' + name + '\n\n' +
@@ -2181,7 +2178,7 @@ function renderAssessment(el, r, idx) {
   if (badgeEl) {
     var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
     var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
-    var s3tag = r.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">S3</span>' : '';
+    var s3tag = r.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">⚑ Review</span>' : '';
     badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>' + s3tag;
   }
 
