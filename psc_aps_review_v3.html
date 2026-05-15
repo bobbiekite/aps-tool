@@ -1,0 +1,3098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PSC APS - Appointment Review</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+:root {
+  --crimson: #8B1A2B;
+  --crimson-hover: #a31f33;
+  --crimson-bg: #fdf5f6;
+  --ink: #1a1a1a;
+  --ink-mid: #555;
+  --ink-faint: #999;
+  --rule: #e8e8e6;
+  --surface: #ffffff;
+  --bg: #f4f3f1;
+  --green: #276b43;
+  --green-bg: #edf7f2;
+  --amber: #996600;
+  --amber-bg: #fef8e7;
+  --blue: #1a4d7a;
+  --blue-bg: #eef4fb;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; font-size: 14px; }
+
+header { background: var(--crimson); padding: 16px 32px; display: flex; align-items: center; gap: 16px; }
+.hdr-mark { font-family: 'DM Serif Display', serif; color: white; font-size: 22px; }
+.hdr-div { width: 1px; height: 20px; background: rgba(255,255,255,0.25); }
+.hdr-sub { color: rgba(255,255,255,0.65); font-size: 13px; }
+
+main { max-width: 1080px; margin: 0 auto; padding: 28px 24px 60px; }
+
+.step-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); margin-bottom: 12px; }
+
+.upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.upload-zone-full { grid-column: 1 / -1; }
+
+/* EVAL PANEL */
+.panel-evals {
+  display: none;
+  overflow-y: auto;
+  padding: 20px;
+  background: #f4f3f1;
+  grid-column: 1 / -1;
+}
+.overlay-body.view-evals .panel-evals { display: block; }
+
+.eval-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--crimson); margin: 0 0 10px; }
+.eval-summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.eval-stat-card { background: white; border: 1px solid var(--rule); border-radius: 7px; padding: 12px 14px; }
+.eval-stat-n { font-size: 24px; font-weight: 600; color: var(--ink); line-height: 1; margin-bottom: 2px; }
+.eval-stat-n.good { color: var(--green); }
+.eval-stat-n.warn { color: var(--amber); }
+.eval-stat-n.bad { color: var(--crimson); }
+.eval-stat-l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-faint); }
+
+.eval-term-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
+.eval-term-table th { padding: 7px 10px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-faint); background: #f0efed; border-bottom: 1px solid var(--rule); }
+.eval-term-table td { padding: 7px 10px; border-bottom: 1px solid var(--rule); }
+.eval-term-table tr:last-child td { border-bottom: none; }
+.eval-score-bar { display: flex; align-items: center; gap: 8px; }
+.eval-score-bar-bg { flex: 1; background: var(--rule); border-radius: 3px; height: 5px; }
+.eval-score-bar-fill { height: 5px; border-radius: 3px; background: var(--crimson); }
+
+.eval-q-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+.eval-q-row { background: white; border: 1px solid var(--rule); border-radius: 6px; padding: 9px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.eval-q-label { font-size: 11px; color: var(--ink-mid); flex: 1; }
+.eval-q-score { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.eval-q-score.good { color: var(--green); }
+.eval-q-score.warn { color: var(--amber); }
+.eval-q-score.bad { color: var(--crimson); }
+
+.eval-comment-block { background: white; border: 1px solid var(--rule); border-radius: 7px; padding: 12px 14px; margin-bottom: 8px; }
+.eval-comment-meta { font-size: 10px; color: var(--ink-faint); margin-bottom: 5px; }
+.eval-comment-text { font-size: 12px; color: var(--ink-mid); line-height: 1.55; font-style: italic; }
+
+.eval-no-data { padding: 40px; text-align: center; color: var(--ink-faint); font-size: 13px; }
+
+.upload-zone { background: var(--surface); border: 2px dashed #d0cfc9; border-radius: 10px; padding: 26px 22px; cursor: pointer; transition: border-color 0.18s, background 0.18s; position: relative; user-select: none; }
+.upload-zone:hover { border-color: var(--crimson); background: var(--crimson-bg); }
+.upload-zone.loaded { border-style: solid; border-color: var(--green); background: var(--green-bg); }
+.upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.upload-zone.loaded input[type=file] { pointer-events: none; }
+
+.uz-icon { font-size: 26px; margin-bottom: 8px; }
+.uz-title { font-weight: 600; font-size: 15px; margin-bottom: 3px; }
+.uz-hint { font-size: 12px; color: var(--ink-faint); }
+.uz-status { display: none; font-size: 12px; font-weight: 600; color: var(--green); margin-top: 8px; }
+.upload-zone.loaded .uz-status { display: block; }
+.upload-zone.loaded .uz-hint { display: none; }
+
+.btn-clear { display: none; position: absolute; top: 10px; right: 10px; background: none; border: 1px solid rgba(0,0,0,0.15); border-radius: 5px; padding: 2px 8px; font-size: 11px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--ink-mid); z-index: 2; }
+.btn-clear:hover { background: rgba(0,0,0,0.06); }
+.upload-zone.loaded .btn-clear { display: block; }
+
+.action-row { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+.btn-build { background: var(--crimson); color: white; border: none; padding: 10px 22px; border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; opacity: 0.35; pointer-events: none; transition: background 0.15s; }
+.btn-build.ready { opacity: 1; pointer-events: auto; }
+.btn-build.ready:hover { background: var(--crimson-hover); }
+.action-note { font-size: 12px; color: var(--ink-faint); }
+
+.error-msg { display: none; background: #fff0f1; border: 1px solid #f0c0c5; border-radius: 7px; padding: 11px 15px; font-size: 13px; color: var(--crimson); margin-bottom: 16px; }
+.error-msg.show { display: block; }
+
+.stats-row { display: none; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+.stats-row.show { display: flex; }
+.stat { background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 16px; min-width: 100px; }
+.stat .n { font-size: 22px; font-weight: 600; line-height: 1; margin-bottom: 2px; }
+.stat .l { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat.green .n { color: var(--green); }
+.stat.amber .n { color: var(--amber); }
+.stat.blue .n { color: var(--blue); }
+
+.table-card { display: none; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; overflow-x: auto; scrollbar-gutter: stable; }
+.table-card.show { display: block; }
+.table-card::-webkit-scrollbar { height: 8px; }
+.table-card::-webkit-scrollbar-track { background: #f0efed; border-radius: 10px; }
+.table-card::-webkit-scrollbar-thumb { background: #c0bfbb; border-radius: 10px; }
+.table-card::-webkit-scrollbar-thumb:hover { background: #a0a09a; }
+table { width: 100%; border-collapse: collapse; min-width: 900px; }
+thead { background: #f0efed; }
+th { padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); white-space: nowrap; }
+td { padding: 11px 14px; border-top: 1px solid var(--rule); vertical-align: middle; }
+tbody tr:hover > td { background: #faf9f7; }
+
+.td-name { font-weight: 600; font-size: 14px; }
+.td-email { color: var(--ink-mid); font-size: 12px; margin-top: 1px; }
+.td-date { color: var(--ink-faint); font-size: 12px; white-space: nowrap; }
+.td-id { font-family: monospace; font-size: 11px; color: var(--ink-faint); }
+
+.badge { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.b-green { background: var(--green-bg); color: var(--green); }
+.b-amber { background: var(--amber-bg); color: var(--amber); }
+.b-grey { background: #f0f0ee; color: var(--ink-faint); }
+.b-blue { background: var(--blue-bg); color: var(--blue); }
+
+.btn-expand { background: none; border: 1px solid var(--rule); border-radius: 5px; padding: 4px 10px; font-size: 11px; font-family: 'DM Sans', sans-serif; cursor: pointer; color: var(--ink-mid); transition: all 0.12s; white-space: nowrap; }
+.btn-expand:hover { border-color: var(--crimson); color: var(--crimson); }
+.btn-expand.open { background: var(--crimson-bg); border-color: var(--crimson); color: var(--crimson); }
+
+.detail-tr { display: none; }
+.detail-tr.open { display: table-row; }
+.detail-tr td { background: #f9f8f6; padding: 18px 20px 22px; border-top: 1px solid #ddd; }
+
+.detail-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--crimson); margin: 0 0 10px; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.q-block { background: white; border: 1px solid var(--rule); border-radius: 7px; padding: 11px 13px; }
+.q-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); margin-bottom: 5px; }
+.q-answer { font-size: 13px; color: var(--ink-mid); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.q-answer.empty { color: #bbb; font-style: italic; }
+
+.cv-link-row { margin-bottom: 14px; }
+.cv-link { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--green); text-decoration: none; padding: 5px 11px; background: var(--green-bg); border-radius: 5px; border: 1px solid #b8dfc9; }
+.cv-link:hover { background: #d8f0e4; }
+
+/* WARNINGS PANEL */
+.warn-panel { display: none; border: 1px solid #f0c896; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+.warn-panel.show { display: block; }
+.warn-header { background: var(--amber-bg); padding: 11px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.warn-header-left { display: flex; align-items: center; gap: 10px; }
+.warn-icon { font-size: 15px; }
+.warn-title { font-size: 13px; font-weight: 600; color: var(--amber); }
+.warn-count { font-size: 11px; background: #f0c060; color: #5a3a00; border-radius: 20px; padding: 1px 8px; font-weight: 600; }
+.warn-toggle { font-size: 11px; color: var(--amber); font-weight: 600; }
+.warn-body { display: none; background: white; }
+.warn-body.open { display: block; }
+.warn-section { padding: 14px 16px; border-top: 1px solid #f0ddb0; }
+.warn-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 10px; }
+.warn-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.warn-list li { font-size: 13px; color: var(--ink-mid); padding: 7px 10px; background: var(--amber-bg); border-radius: 5px; border-left: 3px solid #e0a030; }
+.warn-list li strong { color: var(--ink); }
+.warn-list li .rid { font-family: monospace; font-size: 11px; color: var(--ink-faint); display: block; margin-top: 2px; }
+
+/* REVIEW OVERLAY */
+.overlay { display: none; position: fixed; inset: 0; z-index: 100; background: rgba(20,10,10,0.55); }
+.overlay.open { display: flex; flex-direction: column; }
+
+.overlay-header {
+  background: var(--crimson);
+  padding: 13px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.overlay-name { font-family: 'DM Serif Display', serif; color: white; font-size: 18px; flex: 1; }
+.overlay-meta { color: rgba(255,255,255,0.65); font-size: 12px; }
+.btn-print {
+  background: rgba(255,255,255,0.15);
+  color: white;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-print:hover { background: rgba(255,255,255,0.25); }
+.btn-close-overlay {
+  background: none;
+  color: rgba(255,255,255,0.7);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btn-close-overlay:hover { color: white; border-color: rgba(255,255,255,0.6); }
+
+/* LEFT PANEL - survey */
+.panel-survey {
+  overflow-y: auto;
+  padding: 20px;
+  border-right: 1px solid var(--rule);
+  background: #f4f3f1;
+}
+.panel-title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+.ov-q-block {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 11px 13px;
+  margin-bottom: 10px;
+}
+.ov-q-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--crimson);
+  margin-bottom: 5px;
+}
+.ov-q-answer { font-size: 13px; color: var(--ink-mid); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.ov-q-answer.empty { color: #bbb; font-style: italic; }
+
+/* RIGHT PANEL - CV */
+.panel-cv {
+  display: flex;
+  flex-direction: column;
+  background: #555;
+  overflow: hidden;
+}
+.panel-cv iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+  height: 100%;
+}
+.panel-cv-nocv {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255,255,255,0.5);
+  gap: 10px;
+  font-size: 14px;
+}
+.panel-cv-nocv .nocv-icon { font-size: 36px; opacity: 0.4; }
+
+/* OVERLAY TABS */
+.overlay-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  background: #6b1221;
+  flex-shrink: 0;
+}
+.ov-tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  user-select: none;
+}
+.ov-tab:hover { color: rgba(255,255,255,0.85); }
+.ov-tab.active { color: white; border-bottom-color: white; }
+
+.overlay-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1;
+  overflow: hidden;
+  background: #f4f3f1;
+}
+
+/* AI ASSESSMENT PANEL */
+.panel-ai {
+  display: none;
+  overflow-y: auto;
+  padding: 20px;
+  background: #f4f3f1;
+  grid-column: 1 / -1;
+}
+.panel-ai.active { display: block; }
+.panel-survey.active { display: block; }
+.panel-cv.active { display: flex; }
+.panel-survey, .panel-cv { display: none; }
+
+/* Default show both survey+cv when no AI tab active */
+.overlay-body.view-both .panel-survey { display: block; }
+.overlay-body.view-both .panel-cv { display: flex; }
+.overlay-body.view-ai .panel-ai { display: block; }
+.overlay-body.view-evals .panel-evals { display: block; }
+
+/* AI loading state */
+.ai-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+  color: var(--ink-faint);
+}
+.ai-spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--rule);
+  border-top-color: var(--crimson);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.ai-loading-msg { font-size: 13px; font-style: italic; }
+
+/* AI result layout */
+.ai-rec-banner {
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.ai-rec-banner.assistant { background: #eef4fb; border: 1px solid #b8d0e8; }
+.ai-rec-banner.associate { background: var(--amber-bg); border: 1px solid #e8c878; }
+.ai-rec-banner.full { background: var(--green-bg); border: 1px solid #a8d8b8; }
+.ai-rec-rank {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  line-height: 1;
+}
+.ai-rec-banner.assistant .ai-rec-rank { color: var(--blue); }
+.ai-rec-banner.associate .ai-rec-rank { color: var(--amber); }
+.ai-rec-banner.full .ai-rec-rank { color: var(--green); }
+.ai-rec-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 3px; }
+.ai-rec-summary { font-size: 13px; color: var(--ink-mid); line-height: 1.55; }
+.ai-confidence {
+  margin-left: auto;
+  text-align: center;
+  flex-shrink: 0;
+}
+.ai-confidence .conf-n { font-size: 28px; font-weight: 600; line-height: 1; }
+.ai-confidence .conf-l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-faint); }
+.ai-rec-banner.assistant .conf-n { color: var(--blue); }
+.ai-rec-banner.associate .conf-n { color: var(--amber); }
+.ai-rec-banner.full .conf-n { color: var(--green); }
+
+/* Pillar scores */
+.ai-pillars {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.pillar-card {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 14px;
+}
+.pillar-name { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-faint); margin-bottom: 6px; }
+.pillar-weight { font-size: 10px; color: var(--ink-faint); margin-bottom: 10px; }
+.pillar-score-row { display: flex; align-items: baseline; gap: 6px; margin-bottom: 8px; }
+.pillar-score { font-size: 26px; font-weight: 600; color: var(--ink); line-height: 1; }
+.pillar-max { font-size: 13px; color: var(--ink-faint); }
+.pillar-bar-bg { background: var(--rule); border-radius: 3px; height: 5px; margin-bottom: 10px; }
+.pillar-bar-fill { height: 5px; border-radius: 3px; background: var(--crimson); transition: width 0.5s; }
+.pillar-notes { font-size: 12px; color: var(--ink-mid); line-height: 1.5; }
+
+/* Rubric criteria detail */
+.ai-section-title {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--crimson); margin: 0 0 10px;
+}
+.ai-criteria-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.crit-block {
+  background: white;
+  border: 1px solid var(--rule);
+  border-radius: 7px;
+  padding: 11px 13px;
+}
+.crit-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.crit-name { font-size: 11px; font-weight: 600; color: var(--ink); }
+.crit-score-badge {
+  font-size: 10px; font-weight: 700;
+  padding: 1px 7px; border-radius: 10px;
+  flex-shrink: 0; margin-left: 8px;
+}
+.cs-4 { background: var(--green-bg); color: var(--green); }
+.cs-3 { background: #eef4fb; color: var(--blue); }
+.cs-2 { background: var(--amber-bg); color: var(--amber); }
+.cs-1 { background: #fff0f1; color: var(--crimson); }
+.cs-na { background: #f0f0ee; color: var(--ink-faint); }
+.crit-rationale { font-size: 12px; color: var(--ink-mid); line-height: 1.5; }
+
+/* Flags */
+.ai-flags { margin-bottom: 20px; }
+.flag-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--amber-bg); border: 1px solid #e8c878;
+  border-radius: 7px; padding: 10px 13px; margin-bottom: 8px;
+  font-size: 13px; color: var(--ink-mid);
+}
+.flag-icon { flex-shrink: 0; font-size: 14px; }
+
+.ai-disclaimer {
+  font-size: 11px; color: var(--ink-faint); font-style: italic;
+  padding: 12px 14px; background: white; border: 1px solid var(--rule);
+  border-radius: 7px; line-height: 1.55;
+}
+
+/* Run assessment button */
+.btn-run-ai {
+  background: var(--crimson);
+  color: white;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-run-ai:hover { background: var(--crimson-hover); }
+.btn-run-ai:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* BATCH RUN */
+.batch-bar {
+  display: none;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.batch-bar.show { display: flex; }
+.btn-batch {
+  background: var(--ink);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 7px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.btn-batch:hover { background: #333; }
+.btn-batch:disabled { opacity: 0.45; cursor: not-allowed; }
+.batch-progress-wrap { flex: 1; min-width: 180px; }
+.batch-progress-label { font-size: 12px; color: var(--ink-mid); margin-bottom: 6px; }
+.batch-progress-bg { background: var(--rule); border-radius: 4px; height: 6px; }
+.batch-progress-fill { height: 6px; border-radius: 4px; background: var(--crimson); transition: width 0.3s; width: 0%; }
+.batch-summary { font-size: 12px; color: var(--ink-faint); flex-shrink: 0; }
+
+/* SETTINGS PANEL */
+.settings-panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.settings-label { font-size: 12px; font-weight: 600; color: var(--ink-mid); white-space: nowrap; }
+.settings-key-wrap { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 260px; }
+.settings-key-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fafaf9;
+  letter-spacing: 0.05em;
+}
+.settings-key-input:focus { outline: none; border-color: var(--crimson); }
+.btn-save-key {
+  background: var(--crimson);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-save-key:hover { background: var(--crimson-hover); }
+.key-status { font-size: 12px; white-space: nowrap; }
+.key-status.set { color: var(--green); font-weight: 600; }
+.key-status.unset { color: var(--ink-faint); }
+@media print {
+  body > header, main { display: none !important; }
+  .overlay { display: block !important; position: static !important; background: none !important; }
+  .overlay-header { background: var(--crimson) !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .btn-print, .btn-close-overlay, .btn-run-ai, .overlay-tabs { display: none !important; }
+  .overlay-body { display: block !important; }
+  .panel-survey { display: block !important; overflow: visible !important; border: none !important; padding: 0 !important; }
+  .panel-cv, .panel-ai { display: none !important; }
+  .ov-q-block { break-inside: avoid; }
+}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+<header>
+  <div class="hdr-mark">PSC</div>
+  <div class="hdr-div"></div>
+  <div class="hdr-sub">Adjunct Professorial Series &mdash; Appointment Review</div>
+</header>
+
+<main>
+
+  <div class="upload-grid">
+    <div class="upload-zone" id="csvZone">
+      <button class="btn-clear" id="csvClear">x Clear</button>
+      <input type="file" id="csvFile" accept=".csv">
+      <div class="uz-icon">&#128196;</div>
+      <div class="uz-title">Survey Responses (CSV)</div>
+      <div class="uz-hint">Qualtrics export &mdash; .csv file</div>
+      <div class="uz-status" id="csvStatus"></div>
+    </div>
+
+    <div class="upload-zone" id="cvZone">
+      <button class="btn-clear" id="cvClear">x Clear</button>
+      <input type="file" id="cvFiles" accept=".pdf" multiple>
+      <div class="uz-icon">&#128203;</div>
+      <div class="uz-title">CV Files (PDF)</div>
+      <div class="uz-hint">One or more PDFs named R_ResponseId_...</div>
+      <div class="uz-status" id="cvStatus"></div>
+    </div>
+
+    <div class="upload-zone upload-zone-full" id="evalZone">
+      <button class="btn-clear" id="evalClear">x Clear</button>
+      <input type="file" id="evalFile" accept=".csv,.xlsx">
+      <div class="uz-icon">&#128200;</div>
+      <div class="uz-title">Course Evaluations (CSV or XLSX)</div>
+      <div class="uz-hint">Static reference file with eval data + Instructor_Syntheses sheet — matched by DU ID. XLSX or CSV.</div>
+      <div class="uz-status" id="evalStatus"></div>
+    </div>
+  </div>
+
+  <div class="action-row">
+    <button class="btn-build" id="buildBtn">Build Roster</button>
+    <span class="action-note" id="actionNote">Upload the CSV to continue</span>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- MISMATCH WARNINGS -->
+  <div class="warn-panel" id="warnPanel">
+    <div class="warn-header" onclick="toggleWarnings()">
+      <div class="warn-header-left">
+        <span class="warn-icon">&#9888;</span>
+        <span class="warn-title">Mismatch Warnings</span>
+        <span class="warn-count" id="warnCount">0</span>
+      </div>
+      <span class="warn-toggle" id="warnToggle">Show details</span>
+    </div>
+    <div class="warn-body" id="warnBody">
+      <div class="warn-section" id="noCVSection" style="display:none">
+        <div class="warn-section-title">Respondents with no CV uploaded</div>
+        <ul class="warn-list" id="noCVList"></ul>
+      </div>
+      <div class="warn-section" id="noRowSection" style="display:none">
+        <div class="warn-section-title">CV files with no matching survey response</div>
+        <ul class="warn-list" id="noRowList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="stats-row" id="statsRow">
+    <div class="stat green"><div class="n" id="sTotal">0</div><div class="l">Respondents</div></div>
+    <div class="stat blue"><div class="n" id="sCV">0</div><div class="l">CVs Matched</div></div>
+    <div class="stat amber"><div class="n" id="sNoCV">0</div><div class="l">No CV</div></div>
+    <div class="stat amber"><div class="n" id="sPartial">0</div><div class="l">Incomplete</div></div>
+  </div>
+
+  <!-- BATCH RUN BAR -->
+  <div class="batch-bar" id="batchBar">
+    <button class="btn-batch" id="batchBtn" onclick="runBatchAssessments()">Run All AI Assessments</button>
+    <button class="btn-batch" id="batchStopBtn" onclick="stopBatch()" style="display:none;background:#666">Stop</button>
+    <div class="batch-progress-wrap">
+      <div class="batch-progress-label" id="batchLabel">Ready to run assessments for all candidates</div>
+      <div class="batch-progress-bg"><div class="batch-progress-fill" id="batchFill"></div></div>
+    </div>
+    <div class="batch-summary" id="batchSummary"></div>
+    <button class="btn-batch" id="exportCsvBtn" onclick="exportCSV()" style="display:none;background:var(--green)">Export to CSV</button>
+    <button class="btn-batch" id="exportWordBtn" onclick="downloadAllWordDocs()" style="display:none;background:#1a4d7a">Download All as Word</button>
+  </div>
+
+  <div class="table-card" id="tableCard">
+    <div id="tableScrollTop" style="overflow-x:auto;overflow-y:hidden;height:16px;border-bottom:1px solid #e8e8e6;">
+      <div id="tableScrollTopInner" style="height:16px;"></div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>DU Email</th>
+          <th>Submitted</th>
+          <th>Complete</th>
+          <th>Industry Active</th>
+          <th>CV</th>
+          <th>Response ID</th>
+          <th>AI Rec</th>
+          <th style="min-width:140px"></th>
+        </tr>
+      </thead>
+      <tbody id="rosterBody"></tbody>
+    </table>
+  </div>
+</main>
+
+<!-- REVIEW OVERLAY -->
+<div class="overlay" id="reviewOverlay">
+  <div class="overlay-header">
+    <div class="overlay-name" id="ovName"></div>
+    <div class="overlay-meta" id="ovMeta"></div>
+    <button class="btn-print" onclick="window.print()">Print Survey</button>
+    <button class="btn-print" id="btnDownloadAssessment" onclick="downloadAssessment()" style="display:none">Download HTML</button>
+    <button class="btn-print" id="btnDownloadWord" onclick="downloadWordDoc(S.currentReviewIdx)" style="display:none">Download Word</button>
+    <button class="btn-close-overlay" onclick="closeReview()">Close</button>
+  </div>
+  <div class="overlay-tabs">
+    <div class="ov-tab active" id="tab-both" onclick="switchTab('both')">Survey + CV</div>
+    <div class="ov-tab" id="tab-evals" onclick="switchTab('evals')">Evaluations</div>
+    <div class="ov-tab" id="tab-ai" onclick="switchTab('ai')">AI Assessment</div>
+  </div>
+  <div class="overlay-body view-both" id="overlayBody">
+    <div class="panel-survey" id="ovSurvey">
+      <div class="panel-title">Survey Responses</div>
+    </div>
+    <div class="panel-cv" id="ovCV"></div>
+    <div class="panel-evals" id="ovEvals"></div>
+    <div class="panel-ai" id="ovAI"></div>
+  </div>
+</div>
+
+<script>
+// All state in memory only - no localStorage
+var S = {
+  rows: [],
+  cvMap: {},
+  labels: {},
+  currentReviewIdx: null,
+  apiKey: '',
+  evalRows: [],
+  evalByDUID: {},
+  synthByDUID: {},
+  batchStopped: false
+};
+
+function saveKey() {
+  var val = document.getElementById('apiKeyInput').value.trim();
+  if (!val) return;
+  S.apiKey = val;
+  document.getElementById('apiKeyInput').value = '';
+  document.getElementById('keyStatus').textContent = 'Key set \u2014 ready for AI assessments';
+  document.getElementById('keyStatus').className = 'key-status set';
+}
+
+// Survey question columns to display in detail view
+// key = Qualtrics machine key from row 1 of CSV
+var QCOLS = [
+  { k: 'Q5',  f: 'Industry Active' },
+  { k: 'Q6',  f: 'Industry - Other' },
+  { k: 'Q9',  f: 'Q2.1 Teaching Engagement' },
+  { k: 'Q10', f: 'Q2.2 Course Materials' },
+  { k: 'Q12', f: 'Q2.3 Professional Experience in Class' },
+  { k: 'Q13', f: 'Q2.4 Curriculum Development' },
+  { k: 'Q14', f: 'Q2.5 Student Mentoring' },
+  { k: 'Q15', f: 'Q2.6 Peer Observations' },
+  { k: 'Q16', f: 'Q2.6a Observation Outcome' },
+  { k: 'Q17', f: 'Q2.7 Teaching Growth' },
+  { k: 'Q19', f: 'Q3.1 Committees / Governance' },
+  { k: 'Q20', f: 'Q3.2 Network Value for Students' },
+  { k: 'Q21', f: 'Q3.3 Student Recruitment' },
+  { k: 'Q22', f: 'Q3.4 Professional / Public Service' },
+  { k: 'Q23', f: 'Q3.5 Current Professional Role' },
+  { k: 'Q26', f: 'Q4.1 Presentations / Publications' },
+  { k: 'Q27', f: 'Q4.2 Research / Applied Work' },
+  { k: 'Q28', f: 'Q4.3 Grants' },
+  { k: 'Q30', f: 'Q5.1 Most Proud Of' },
+  { k: 'Q31', f: 'Q5.2 Hardest Parts' },
+  { k: 'Q32', f: 'Q5.3 How PSC Can Support' },
+  { k: 'Q33', f: 'Q5.4 Goals Next Two Quarters' },
+  { k: 'Q35', f: 'Q5.6 Anything Else' }
+];
+
+// Wire up events after DOM ready
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('csvFile').addEventListener('change', onCSV);
+  document.getElementById('cvFiles').addEventListener('change', onCVs);
+  document.getElementById('evalFile').addEventListener('change', onEvals);
+  document.getElementById('buildBtn').addEventListener('click', buildRoster);
+  document.getElementById('evalClear').addEventListener('click', function(e) {
+    e.stopPropagation();
+    S.evalRows = []; S.evalByDUID = {}; S.synthByDUID = {};
+    document.getElementById('evalZone').classList.remove('loaded');
+    document.getElementById('evalStatus').textContent = '';
+    document.getElementById('evalFile').value = '';
+  });
+  document.getElementById('apiKeyInput') && document.getElementById('apiKeyInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') saveKey();
+  });
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeReview();
+  });
+
+  // Sync top scrollbar with table
+  var tableCard = document.getElementById('tableCard');
+  var topScroll = document.getElementById('tableScrollTop');
+  tableCard.addEventListener('scroll', function() { topScroll.scrollLeft = tableCard.scrollLeft; });
+  topScroll.addEventListener('scroll', function() { tableCard.scrollLeft = topScroll.scrollLeft; });
+  document.getElementById('csvClear').addEventListener('click', function(e) {
+    e.stopPropagation();
+    S.rows = []; S.labels = {};
+    document.getElementById('csvZone').classList.remove('loaded');
+    document.getElementById('csvStatus').textContent = '';
+    document.getElementById('csvFile').value = '';
+    hideRoster(); updateUI();
+  });
+  document.getElementById('cvClear').addEventListener('click', function(e) {
+    e.stopPropagation();
+    S.cvMap = {};
+    document.getElementById('cvZone').classList.remove('loaded');
+    document.getElementById('cvStatus').textContent = '';
+    document.getElementById('cvFiles').value = '';
+    updateUI();
+  });
+});
+
+// Parse CSV text into array of arrays
+function parseCSV(text) {
+  var rows = [];
+  var row = [];
+  var cell = '';
+  var inQ = false;
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    if (ch === '"') {
+      if (inQ && text[i+1] === '"') { cell += '"'; i++; }
+      else { inQ = !inQ; }
+    } else if (ch === ',' && !inQ) {
+      row.push(cell); cell = '';
+    } else if ((ch === '\n' || ch === '\r') && !inQ) {
+      if (ch === '\r' && text[i+1] === '\n') i++;
+      row.push(cell); cell = '';
+      if (row.some(function(v){ return v.trim(); })) rows.push(row);
+      row = [];
+    } else {
+      cell += ch;
+    }
+  }
+  if (cell || row.length) { row.push(cell); if (row.some(function(v){ return v.trim(); })) rows.push(row); }
+  return rows;
+}
+
+function onCSV(evt) {
+  var file = evt.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var parsed = parseCSV(e.target.result);
+      // Qualtrics: row 0 = machine keys, row 1 = human labels, row 2 = import meta, row 3+ = data
+      if (parsed.length < 3) { showError('CSV has fewer than 3 rows - check the file.'); return; }
+
+      var keys = parsed[0];
+      var humanRow = parsed[1];
+
+      // Build label map
+      S.labels = {};
+      for (var i = 0; i < keys.length; i++) {
+        S.labels[keys[i]] = (humanRow[i] || keys[i]).replace(/\n[\s\S]*/g, '').trim();
+      }
+
+      // Parse respondent rows (start at index 3)
+      S.rows = [];
+      for (var r = 3; r < parsed.length; r++) {
+        var dataRow = parsed[r];
+        var obj = {};
+        for (var c = 0; c < keys.length; c++) {
+          obj[keys[c]] = (dataRow[c] || '').trim();
+        }
+        if (obj['ResponseId']) S.rows.push(obj);
+      }
+
+      document.getElementById('csvZone').classList.add('loaded');
+      document.getElementById('csvStatus').textContent =
+        S.rows.length + ' response' + (S.rows.length !== 1 ? 's' : '') + ' loaded';
+      hideError();
+      updateUI();
+    } catch(err) {
+      showError('Could not read CSV: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function onCVs(evt) {
+  var files = evt.target.files;
+  if (!files || !files.length) return;
+  S.cvMap = {};
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    // ResponseId = text before second underscore: R_xxxxxxx
+    var parts = f.name.split('_');
+    if (parts.length >= 2) {
+      var rid = parts[0] + '_' + parts[1];
+      S.cvMap[rid] = { name: f.name, url: URL.createObjectURL(f) };
+    }
+  }
+  var count = Object.keys(S.cvMap).length;
+  document.getElementById('cvZone').classList.add('loaded');
+  document.getElementById('cvStatus').textContent =
+    count + ' CV' + (count !== 1 ? 's' : '') + ' loaded (' + files.length + ' file' + (files.length !== 1 ? 's' : '') + ')';
+  updateUI();
+}
+
+function updateUI() {
+  var btn = document.getElementById('buildBtn');
+  var note = document.getElementById('actionNote');
+  var hasCsv = S.rows.length > 0;
+  var cvCount = Object.keys(S.cvMap).length;
+  if (hasCsv) {
+    btn.classList.add('ready');
+    note.textContent = S.rows.length + ' respondent' + (S.rows.length !== 1 ? 's' : '') +
+      (cvCount ? ', ' + cvCount + ' CV' + (cvCount !== 1 ? 's' : '') + ' loaded' : ' (no CVs yet)');
+  } else {
+    btn.classList.remove('ready');
+    note.textContent = 'Upload the CSV to continue';
+  }
+}
+
+// ── CHECK MINIMUM SURVEY DATA FOR ASSESSMENT ──
+// Teaching core: Q9, Q10, Q12, Q13 — at least 2 must have substantive answers
+// Service core: Q22, Q23 — at least 1 must have a substantive answer
+function hasMinimumSurveyData(row) {
+  var teachingQs = ['Q9', 'Q10', 'Q12', 'Q13'];
+  var serviceQs = ['Q22', 'Q23'];
+  var minLength = 20; // at least 20 chars = substantive answer
+
+  var teachingAnswered = teachingQs.filter(function(k) {
+    return (row[k] || '').trim().length >= minLength;
+  }).length;
+
+  var serviceAnswered = serviceQs.filter(function(k) {
+    return (row[k] || '').trim().length >= minLength;
+  }).length;
+
+  return teachingAnswered >= 2 && serviceAnswered >= 1;
+}
+
+function buildRoster() {
+  if (!S.rows.length) return;
+  hideError();
+
+  var total = S.rows.length;
+  var cvMatched = 0;
+  var noCV = 0;
+  var partial = 0;
+  var tbody = document.getElementById('rosterBody');
+  tbody.innerHTML = '';
+
+  S.rows.forEach(function(row, idx) {
+    var rid      = row['ResponseId'] || '';
+    var first    = row['RecipientFirstName'] || '';
+    var last     = row['RecipientLastName'] || '';
+    var email    = row['RecipientEmail'] || '';
+    var persEmail= row['Personal Email'] || '';
+    var recorded = row['RecordedDate'] || '';
+    var finished = row['Finished'] || '';
+    var progress = row['Progress'] || '0';
+    var industry = row['Q5'] || '';
+    var complete = (finished === 'True' || finished === '1' || finished === 'true');
+
+    if (!complete) partial++;
+
+    var cv = S.cvMap[rid] || null;
+    if (cv) cvMatched++; else noCV++;
+
+    var dateStr = '';
+    if (recorded) {
+      try { var d = new Date(recorded); dateStr = (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear(); }
+      catch(e) { dateStr = recorded.substring(0, 10); }
+    }
+
+    var nameStr = (last && first) ? last + ', ' + first : (last || first || '(no name)');
+    var displayEmail = email || persEmail;
+
+    // Main row
+    var tr = document.createElement('tr');
+    var hasSurveyData = hasMinimumSurveyData(row);
+    row._insufficientData = !hasSurveyData;
+
+    tr.innerHTML =
+      '<td>' +
+        '<div class="td-name">' + esc(nameStr) + '</div>' +
+        (displayEmail ? '<div class="td-email">' + esc(displayEmail) + '</div>' : '') +
+      '</td>' +
+      '<td class="td-email">' + esc(email) + '</td>' +
+      '<td class="td-date">' + esc(dateStr) + '</td>' +
+      '<td>' + (complete
+        ? '<span class="badge b-green">Complete</span>'
+        : '<span class="badge b-amber">Partial ' + esc(progress) + '%</span>') +
+      '</td>' +
+      '<td>' + (industry
+        ? '<span class="badge b-blue">' + esc(industry.length > 35 ? industry.substring(0,35)+'...' : industry) + '</span>'
+        : '<span class="badge b-grey">Not answered</span>') +
+      '</td>' +
+      '<td>' + (cv
+        ? '<span class="badge b-green">Uploaded</span>'
+        : '<span class="badge b-grey">None</span>') +
+      '</td>' +
+      '<td class="td-id">' + esc(rid) + '</td>' +
+      '<td id="airecbadge-' + idx + '">' + (!hasSurveyData
+        ? '<span class="badge b-grey" style="font-size:10px;color:var(--crimson)">Insufficient Data</span>'
+        : '<span class="badge b-grey" style="font-size:10px">Not run</span>') +
+      '</td>' +
+      '<td style="white-space:nowrap;min-width:140px">' +
+        '<button class="btn-expand" id="expbtn-' + idx + '" onclick="toggleDetail(' + idx + ')">View</button> ' +
+        '<button class="btn-expand" onclick="openReview(' + idx + ')" style="background:var(--crimson-bg);border-color:var(--crimson);color:var(--crimson)">Review</button>' +
+      '</td>';
+
+    tbody.appendChild(tr);
+
+    // Detail row
+    var dtr = document.createElement('tr');
+    dtr.className = 'detail-tr';
+    dtr.id = 'detail-' + idx;
+
+    var html = '<td colspan="9">';
+
+    if (cv) {
+      html += '<div class="cv-link-row"><a class="cv-link" href="' + esc(cv.url) + '" target="_blank">Open CV &mdash; ' + esc(cv.name) + '</a></div>';
+    }
+
+    html += '<div class="detail-section-title">Survey Responses</div><div class="detail-grid">';
+
+    QCOLS.forEach(function(q) {
+      var val = row[q.k] || '';
+      // Use human label from CSV if we have it, else fallback
+      var rawLabel = S.labels[q.k] || q.f;
+      // Trim to first line, max 80 chars
+      var label = rawLabel.split('\n')[0].trim();
+      if (label.length > 80) label = label.substring(0,80) + '...';
+
+      html += '<div class="q-block">' +
+        '<div class="q-label">' + esc(label) + '</div>' +
+        '<div class="q-answer' + (val ? '' : ' empty') + '">' + (val ? esc(val) : 'No response') + '</div>' +
+        '</div>';
+    });
+
+    html += '</div></td>';
+    dtr.innerHTML = html;
+    tbody.appendChild(dtr);
+  });
+
+  document.getElementById('sTotal').textContent = total;
+  document.getElementById('sCV').textContent = cvMatched;
+  document.getElementById('sNoCV').textContent = noCV;
+  document.getElementById('sPartial').textContent = partial;
+  document.getElementById('statsRow').classList.add('show');
+  document.getElementById('tableCard').classList.add('show');
+
+  // Match top scrollbar width to table width
+  setTimeout(function() {
+    var tbl = document.querySelector('#tableCard table');
+    if (tbl) document.getElementById('tableScrollTopInner').style.width = tbl.scrollWidth + 'px';
+  }, 50);
+  document.getElementById('batchBar').classList.add('show');
+  document.getElementById('batchFill').style.width = '0%';
+  document.getElementById('batchLabel').textContent = 'Ready to run assessments for all ' + total + ' candidates';
+  document.getElementById('batchSummary').textContent = '';
+  document.getElementById('batchBtn').disabled = false;
+  document.getElementById('batchBtn').textContent = 'Run All AI Assessments';
+  document.getElementById('batchStopBtn').style.display = 'none';
+  document.getElementById('exportCsvBtn').style.display = 'inline-block';
+  document.getElementById('exportWordBtn').style.display = 'none'; // only after assessments run
+  S.batchStopped = false;
+
+  // Build warnings panel
+  // Scenario A: CSV rows with no CV
+  var noCVItems = [];
+  S.rows.forEach(function(row) {
+    var rid = row['ResponseId'] || '';
+    if (!S.cvMap[rid]) {
+      var first = row['RecipientFirstName'] || '';
+      var last  = row['RecipientLastName']  || '';
+      var email = row['RecipientEmail'] || row['Personal Email'] || '';
+      var name  = (last && first) ? last + ', ' + first : (last || first || '(no name)');
+      noCVItems.push({ name: name, email: email, rid: rid });
+    }
+  });
+
+  // Scenario B: CV files with no CSV row
+  var csvRids = {};
+  S.rows.forEach(function(row) { if (row['ResponseId']) csvRids[row['ResponseId']] = true; });
+  var noRowItems = [];
+  Object.keys(S.cvMap).forEach(function(rid) {
+    if (!csvRids[rid]) {
+      noRowItems.push({ filename: S.cvMap[rid].name, rid: rid });
+    }
+  });
+
+  var totalWarnings = noCVItems.length + noRowItems.length;
+
+  if (totalWarnings > 0) {
+    document.getElementById('warnCount').textContent = totalWarnings;
+    document.getElementById('warnPanel').classList.add('show');
+
+    var noCVList = document.getElementById('noCVList');
+    var noCVSection = document.getElementById('noCVSection');
+    noCVList.innerHTML = '';
+    if (noCVItems.length > 0) {
+      noCVSection.style.display = 'block';
+      noCVItems.forEach(function(item) {
+        var li = document.createElement('li');
+        li.innerHTML = '<strong>' + esc(item.name) + '</strong>' +
+          (item.email ? ' &mdash; ' + esc(item.email) : '') +
+          '<span class="rid">' + esc(item.rid) + '</span>';
+        noCVList.appendChild(li);
+      });
+    } else {
+      noCVSection.style.display = 'none';
+    }
+
+    var noRowList = document.getElementById('noRowList');
+    var noRowSection = document.getElementById('noRowSection');
+    noRowList.innerHTML = '';
+    if (noRowItems.length > 0) {
+      noRowSection.style.display = 'block';
+      noRowItems.forEach(function(item) {
+        var li = document.createElement('li');
+        li.innerHTML = '<strong>' + esc(item.filename) + '</strong>' +
+          '<span class="rid">Extracted ID: ' + esc(item.rid) + '</span>';
+        noRowList.appendChild(li);
+      });
+    } else {
+      noRowSection.style.display = 'none';
+    }
+  } else {
+    document.getElementById('warnPanel').classList.remove('show');
+  }
+}
+
+function openReview(idx) {
+  var row = S.rows[idx];
+  if (!row) return;
+
+  S.currentReviewIdx = idx;
+
+  var first = row['RecipientFirstName'] || '';
+  var last  = row['RecipientLastName']  || '';
+  var email = row['RecipientEmail'] || row['Personal Email'] || '';
+  var recorded = row['RecordedDate'] || '';
+  var rid   = row['ResponseId'] || '';
+  var nameStr = (last && first) ? last + ', ' + first : (last || first || '(no name)');
+
+  var dateStr = '';
+  if (recorded) {
+    try { var d = new Date(recorded); dateStr = (d.getMonth()+1) + '/' + d.getDate() + '/' + d.getFullYear(); } catch(e) {}
+  }
+
+  // Header
+  document.getElementById('ovName').textContent = nameStr;
+  document.getElementById('ovMeta').textContent =
+    (email ? email + '   ' : '') + (dateStr ? 'Submitted ' + dateStr : '') + '   ' + rid;
+
+  // Reset to Survey+CV tab
+  switchTab('both');
+
+  // Survey panel
+  var surveyEl = document.getElementById('ovSurvey');
+  surveyEl.innerHTML = '<div class="panel-title">Survey Responses</div>';
+  QCOLS.forEach(function(q) {
+    var val = row[q.k] || '';
+    var rawLabel = S.labels[q.k] || q.f;
+    var label = rawLabel.split('\n')[0].trim();
+    if (label.length > 80) label = label.substring(0, 80) + '...';
+    var block = document.createElement('div');
+    block.className = 'ov-q-block';
+    block.innerHTML =
+      '<div class="ov-q-label">' + esc(label) + '</div>' +
+      '<div class="ov-q-answer' + (val ? '' : ' empty') + '">' + (val ? esc(val) : 'No response') + '</div>';
+    surveyEl.appendChild(block);
+  });
+
+  // CV panel
+  var cvEl = document.getElementById('ovCV');
+  var cv = S.cvMap[rid] || null;
+  if (cv) {
+    cvEl.innerHTML = '<iframe src="' + cv.url + '" title="CV"></iframe>';
+  } else {
+    cvEl.innerHTML =
+      '<div class="panel-cv-nocv">' +
+        '<div class="nocv-icon">&#128203;</div>' +
+        '<div>No CV uploaded for this respondent</div>' +
+      '</div>';
+  }
+
+  // Clear AI and evals panels so they re-run fresh when tab is clicked
+  var aiEl = document.getElementById('ovAI');
+  aiEl.innerHTML = '';
+  aiEl.dataset.idx = '';
+  var evEl = document.getElementById('ovEvals');
+  evEl.innerHTML = '';
+  evEl.dataset.idx = '';
+  // Don't clear _commentSynthesis cache — keep it across re-opens
+
+  document.getElementById('reviewOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+// ── BATCH RUN ALL ASSESSMENTS ──
+function stopBatch() {
+  S.batchStopped = true;
+  document.getElementById('batchStopBtn').style.display = 'none';
+  document.getElementById('batchBtn').disabled = false;
+  document.getElementById('batchBtn').textContent = 'Resume / Re-run All';
+  document.getElementById('batchLabel').textContent += ' — stopped';
+}
+
+function runBatchAssessments() {
+  if (!S.rows.length) return;
+
+  var btn = document.getElementById('batchBtn');
+  var stopBtn = document.getElementById('batchStopBtn');
+  var label = document.getElementById('batchLabel');
+  var fill = document.getElementById('batchFill');
+  var summary = document.getElementById('batchSummary');
+
+  S.batchStopped = false;
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+  stopBtn.style.display = 'inline-block';
+
+  var total = S.rows.length;
+  var completed = 0;
+  var counts = { assistant: 0, associate: 0, full: 0, error: 0 };
+
+  function updateProgress() {
+    var pct = Math.round((completed / total) * 100);
+    fill.style.width = pct + '%';
+    label.textContent = completed + ' of ' + total + ' assessed';
+    summary.textContent =
+      'Full: ' + counts.full +
+      '  Associate: ' + counts.associate +
+      '  Assistant: ' + counts.assistant +
+      (counts.error ? '  Errors: ' + counts.error : '');
+  }
+
+  function processNext(idx) {
+    if (S.batchStopped || idx >= total) {
+      stopBtn.style.display = 'none';
+      btn.disabled = false;
+      btn.textContent = idx >= total ? 'Re-run All Assessments' : 'Resume / Re-run All';
+      if (idx >= total) label.textContent = 'All ' + total + ' assessments complete';
+      // Show word download if any assessments completed
+      var anyAssessed = S.rows.some(function(r) { return r._aiResult; });
+      if (anyAssessed) document.getElementById('exportWordBtn').style.display = 'inline-block';
+      return;
+    }
+
+    var row = S.rows[idx];
+    var prompt = buildPrompt(row);
+    var badgeEl = document.getElementById('airecbadge-' + idx);
+
+    // Skip if insufficient survey data
+    if (row._insufficientData) {
+      if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px;color:var(--crimson)">Insufficient Data</span>';
+      completed++;
+      updateProgress();
+      setTimeout(function() { processNext(idx + 1); }, 100);
+      return;
+    }
+
+    if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px">...</span>';
+
+    var rid = row['ResponseId'] || '';
+    var cv = S.cvMap[rid] || null;
+
+    function sendBatchAssessment(contentArray) {
+      contentArray.push({ type: 'text', text: prompt });
+
+      function attemptFetch(attemptsLeft) {
+        fetch('https://dark-credit-4434.bobbie-kite.workers.dev', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 8000,
+            messages: [{ role: 'user', content: contentArray }]
+          })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data.error) throw new Error('API: ' + (data.error.message || JSON.stringify(data.error)));
+          var text = '';
+          if (data.content && data.content.length) {
+            data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
+          }
+          text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
+
+          // JSON repair fallback for truncated responses
+          var result;
+          try {
+            result = JSON.parse(text);
+          } catch(parseErr) {
+            var truncated = text;
+            truncated = truncated.replace(/,\s*"[^"]*$/, '');
+            truncated = truncated.replace(/:\s*"[^"]*$/, '');
+            truncated = truncated.replace(/,\s*\{[^}]*$/, '');
+            truncated = truncated.replace(/,\s*\[[^\]]*$/, '');
+            var openBrackets = (truncated.match(/\[/g)||[]).length - (truncated.match(/\]/g)||[]).length;
+            var openBraces   = (truncated.match(/\{/g)||[]).length - (truncated.match(/\}/g)||[]).length;
+            for (var ob = 0; ob < openBrackets; ob++) truncated += ']';
+            for (var oc = 0; oc < openBraces;   oc++) truncated += '}';
+            result = JSON.parse(truncated);
+            result._truncated = true;
+          }
+
+          S.rows[idx]._aiResult = result;
+
+          var _rr1 = (result.recommendedRank || '').toLowerCase().trim();
+          var rankKey = (_rr1.indexOf('associate') < 0 && _rr1.indexOf('assistant') < 0 && _rr1.indexOf('professor') >= 0) ? 'full'
+            : _rr1.indexOf('associate') >= 0 ? 'associate'
+            : 'assistant';
+          if (!_rr1) rankKey = 'assistant';
+          counts[rankKey]++;
+
+          if (badgeEl) {
+            var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
+            var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
+            var s3tag = result.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">⚑ Review</span>' : '';
+            badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>' + s3tag;
+          }
+
+          // Generate follow-up questions for borderline cases (confidence < 80% — fire and forget, cached on row)
+          if (result.stage3Recommended || (result.confidence || 0) < 80) {
+            generateFollowUpQuestions(idx, null);
+          }
+
+          completed++;
+          updateProgress();
+          // Wait 1.5s between candidates to avoid rate limiting
+          setTimeout(function() { processNext(idx + 1); }, 1500);
+        })
+        .catch(function(err) {
+          if (attemptsLeft > 0) {
+            // Retry once after a 5s pause (handles transient rate limits)
+            setTimeout(function() { attemptFetch(attemptsLeft - 1); }, 5000);
+          } else {
+            counts.error++;
+            if (badgeEl) badgeEl.innerHTML = '<span class="badge b-grey" style="font-size:10px;color:var(--crimson)">Error</span>';
+            completed++;
+            updateProgress();
+            setTimeout(function() { processNext(idx + 1); }, 1500);
+          }
+        });
+      }
+
+      attemptFetch(1); // 1 retry on failure
+    }
+
+    if (cv && cv.url) {
+      fetch(cv.url)
+        .then(function(r) { return r.arrayBuffer(); })
+        .then(function(buf) {
+          var bytes = new Uint8Array(buf);
+          var binary = '';
+          for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          var b64 = btoa(binary);
+          sendBatchAssessment([{
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: b64 }
+          }]);
+        })
+        .catch(function() { sendBatchAssessment([]); });
+    } else {
+      sendBatchAssessment([]);
+    }
+  } // end processNext
+
+  updateProgress();
+  processNext(0);
+}
+
+// ── LOAD EVAL FILE (CSV or XLSX via SheetJS) ──
+function onEvals(evt) {
+  var file = evt.target.files[0];
+  if (!file) return;
+
+  var isXlsx = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls');
+
+  if (isXlsx && typeof XLSX === 'undefined') {
+    showError('SheetJS library not loaded yet — please wait a moment and try again, or use a CSV export instead.');
+    document.getElementById('evalFile').value = '';
+    return;
+  }
+
+  var reader = new FileReader();
+
+  reader.onerror = function() { showError('Could not read eval file — please try again.'); };
+
+  reader.onload = function(e) {
+    try {
+      var rows = [];
+      var workbook = null;
+
+      if (isXlsx) {
+        var data = new Uint8Array(e.target.result);
+        workbook = XLSX.read(data, { type: 'array' });
+        var sheetName = workbook.SheetNames[0];
+        var sheet = workbook.Sheets[sheetName];
+        rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
+      } else {
+        var parsed = parseCSV(e.target.result);
+        if (parsed.length < 2) { showError('Eval file appears empty.'); return; }
+        var headers = parsed[0];
+        for (var r = 1; r < parsed.length; r++) {
+          var dataRow = parsed[r];
+          if (!dataRow || dataRow.length < 5) continue;
+          var obj = {};
+          for (var c = 0; c < headers.length; c++) {
+            obj[headers[c]] = (dataRow[c] || '').trim();
+          }
+          rows.push(obj);
+        }
+      }
+
+      if (!rows.length) { showError('No data rows found in eval file.'); return; }
+
+      S.evalRows = [];
+      S.evalByDUID = {};
+      S.synthByDUID = {};
+
+      rows.forEach(function(obj) {
+        var rawDUID = obj['DU ID'] !== undefined ? obj['DU ID'] : obj['UniqueID'];
+        var did = rawDUID !== undefined && rawDUID !== null && rawDUID !== ''
+          ? String(parseInt(rawDUID, 10)).trim() : '';
+        if (!did || did === 'NaN' || did === 'DU ID') return;
+        obj['_did'] = did;
+        S.evalRows.push(obj);
+        if (!S.evalByDUID[did]) S.evalByDUID[did] = [];
+        S.evalByDUID[did].push(obj);
+      });
+
+      // Parse Instructor_Syntheses sheet if present in XLSX
+      if (isXlsx && workbook) {
+        var synthSheetName = workbook.SheetNames.find(function(n) {
+          var clean = n.toLowerCase().replace(/[^a-z]/g, '');
+          return clean.indexOf('synthesis') >= 0 || clean.indexOf('syntheses') >= 0;
+        });
+        if (synthSheetName) {
+          var synthSheet = workbook.Sheets[synthSheetName];
+          var synthRows = XLSX.utils.sheet_to_json(synthSheet, { defval: '', raw: true });
+          synthRows.forEach(function(r) {
+            var rawDUID = r['DU ID'] !== undefined ? r['DU ID'] : r['DU_ID'];
+            var did = rawDUID !== undefined && rawDUID !== null
+              ? String(parseInt(rawDUID, 10)).trim() : '';
+            if (!did || did === 'NaN') return;
+            S.synthByDUID[did] = {
+              instructorName: String(r['Instructor Name'] || ''),
+              termsCovered: String(r['Terms Covered'] || ''),
+              q22Count: r['Q22 Comment Count'] || 0,
+              q23Count: r['Q23 Comment Count'] || 0,
+              synthesis: String(r['Synthesis'] || ''),
+              dataFlag: String(r['Data Flag'] || '')
+            };
+          });
+        }
+      }
+
+      var instructorCount = Object.keys(S.evalByDUID).length;
+      var synthCount = Object.keys(S.synthByDUID).length;
+      document.getElementById('evalZone').classList.add('loaded');
+      document.getElementById('evalStatus').textContent =
+        S.evalRows.length.toLocaleString() + ' eval rows — ' + instructorCount + ' instructors' +
+        (synthCount ? ' — ' + synthCount + ' syntheses loaded' : '');
+      hideError();
+    } catch(err) {
+      showError('Could not parse eval file: ' + err.message);
+    }
+  };
+
+  if (isXlsx) {
+    reader.readAsArrayBuffer(file);
+  } else {
+    reader.readAsText(file);
+  }
+}
+
+// ── INSTRUCTOR QUESTIONS (eval file column names) ──
+var INSTRUCTOR_QS = [
+  { col: 'Question 3 - Overall, this is an effective instructor',                                                         label: 'Overall Effectiveness',       type: 'instructor' },
+  { col: 'Question 14 - The instructor demonstrated expertise in the subject matter',                                     label: 'Subject Matter Expertise',    type: 'instructor' },
+  { col: 'Question 15 - The instructor employed teaching methods that helped me understand course content.',               label: 'Teaching Methods',            type: 'instructor' },
+  { col: 'Question 16 - The instructor demonstrated competency with Canvas to meet the needs of the course.',             label: 'Canvas Competency',           type: 'instructor' },
+  { col: 'Question 18 - The instructor provided feedback on course assignments within 7 days after the submission deadline.', label: 'Feedback Timeliness',     type: 'instructor' },
+  { col: 'Question 19 - The instructor\u2019s feedback helped me grow',                                                  label: 'Feedback Quality',            type: 'instructor' },
+  { col: 'Question 20 - The instructor actively engaged in discussions in class or online with substantive comments.',    label: 'Discussion Engagement',       type: 'instructor' },
+  { col: 'Question 21 - The instructor created an inclusive learning environment that included diverse perspectives.',    label: 'Inclusive Environment',       type: 'instructor' }
+];
+
+var COURSE_QS = [
+  { col: 'Question 1 - I learned a great deal in this course',                                label: 'Learned a Great Deal',        type: 'course' },
+  { col: 'Question 2 - Overall, this is an excellent course.',                                label: 'Excellent Course',            type: 'course' },
+  { col: 'Question 5 - I can apply what I learned outside of this course.',                   label: 'Real-World Application',      type: 'course' },
+  { col: 'Question 6 - This course was relevant to my professional goals',                    label: 'Professional Relevance',      type: 'course' },
+  { col: 'Question 8 - In this course I was challenged to critically analyze information.',   label: 'Critical Analysis',           type: 'course' },
+  { col: 'Question 13 - The activities in the course (discussions, group work, etc.) engaged me in learning course content.', label: 'Course Engagement', type: 'course' }
+];
+
+// ── PARSE TERM CODE TO READABLE ──
+function termLabel(t) {
+  var s = String(t);
+  if (s.length < 6) return t;
+  var yr = s.substring(0, 4);
+  var qcode = s.substring(4);
+  var q = qcode === '10' ? 'Winter' : qcode === '30' ? 'Spring' : qcode === '50' ? 'Summer' : qcode === '70' ? 'Fall' : qcode;
+  return q + ' ' + yr;
+}
+
+// ── BUILD EVAL SUMMARY FOR INSTRUCTOR ──
+function buildEvalSummary(duid) {
+  duid = String(parseInt(duid, 10) || '').trim();
+  var rows = S.evalByDUID[duid] || [];
+  if (!rows.length) return null;
+
+  // Parse numeric scores
+  var allQs = INSTRUCTOR_QS.concat(COURSE_QS);
+  rows.forEach(function(r) {
+    allQs.forEach(function(q) {
+      r['_n_' + q.col] = parseFloat(r[q.col]) || null;
+    });
+    r['_term'] = parseInt(r['TERM']) || 0;
+  });
+
+  // Sort by term
+  rows.sort(function(a, b) { return a['_term'] - b['_term']; });
+
+  // All unique terms
+  var allTerms = [];
+  var termSet = {};
+  rows.forEach(function(r) { if (r['_term'] && !termSet[r['_term']]) { termSet[r['_term']] = true; allTerms.push(r['_term']); } });
+  allTerms.sort();
+
+  // Last two terms they have data for
+  var lastTwoTerms = allTerms.slice(-2);
+
+  // Overall averages (all time) for instructor questions
+  function avgQ(qcol, termFilter) {
+    var vals = rows
+      .filter(function(r) { return !termFilter || termFilter.indexOf(r['_term']) >= 0; })
+      .map(function(r) { return r['_n_' + qcol]; })
+      .filter(function(v) { return v !== null && !isNaN(v); });
+    if (!vals.length) return null;
+    return vals.reduce(function(a, b) { return a + b; }, 0) / vals.length;
+  }
+
+  // Q3 per term
+  var q3col = INSTRUCTOR_QS[0].col;
+  var termData = allTerms.map(function(t) {
+    var trows = rows.filter(function(r) { return r['_term'] === t; });
+    var scores = trows.map(function(r) { return r['_n_' + q3col]; }).filter(function(v) { return v !== null; });
+    var avg = scores.length ? scores.reduce(function(a,b){return a+b;},0)/scores.length : null;
+    var respondents = trows.length; // each row = one student response
+    // Response rate: respondents / enrollments (get unique enrollment per CRN)
+    var enrollmentMap = {};
+    trows.forEach(function(r) {
+      var key = String(r['CRN']) + '_' + String(r['TERM']);
+      if (!enrollmentMap[key]) enrollmentMap[key] = parseInt(r['Enrollments']) || 0;
+    });
+    var totalEnrollment = Object.values(enrollmentMap).reduce(function(a,b){return a+b;},0);
+    var rr = totalEnrollment > 0 ? (respondents / totalEnrollment * 100) : 0;
+    var courses = [];
+    var courseSet = {};
+    trows.forEach(function(r) { if (r['CourseTitle'] && !courseSet[r['CourseTitle']]) { courseSet[r['CourseTitle']]=true; courses.push(r['CourseTitle']); } });
+    return { term: t, label: termLabel(t), avg: avg, respondents: respondents, responseRate: rr, courses: courses };
+  });
+
+  // Trend (last 4 terms vs all prior)
+  var recentTerms = allTerms.slice(-4);
+  var priorTerms = allTerms.slice(0, -4);
+  var recentAvg = avgQ(q3col, recentTerms);
+  var priorAvg = priorTerms.length ? avgQ(q3col, priorTerms) : null;
+  var trend = (recentAvg && priorAvg) ? (recentAvg - priorAvg > 0.15 ? 'up' : recentAvg - priorAvg < -0.15 ? 'down' : 'stable') : 'stable';
+
+  // Overall instructor Q averages (all time)
+  var instrAvgs = {};
+  INSTRUCTOR_QS.forEach(function(q) { instrAvgs[q.col] = avgQ(q.col); });
+  var courseAvgs = {};
+  COURSE_QS.forEach(function(q) { courseAvgs[q.col] = avgQ(q.col); });
+
+  // Q22/Q23 comments from last two terms only
+  var commentRows = rows.filter(function(r) { return lastTwoTerms.indexOf(r['_term']) >= 0; });
+  // Find Q22 and Q23 column names dynamically (handles curly vs straight apostrophes)
+  var q22col = '', q23col = '';
+  if (rows.length > 0) {
+    Object.keys(rows[0]).forEach(function(k) {
+      if (k.indexOf('Question 22') >= 0) q22col = k;
+      if (k.indexOf('Question 23') >= 0) q23col = k;
+    });
+  }
+
+  var strengths = commentRows.map(function(r) {
+    return { term: termLabel(r['_term']), text: (r[q22col] || '').trim() };
+  }).filter(function(c) { return c.text && c.text.length > 10; });
+
+  var improvements = commentRows.map(function(r) {
+    return { term: termLabel(r['_term']), text: (r[q23col] || '').trim() };
+  }).filter(function(c) { return c.text && c.text.length > 10; });
+
+  // Total respondents = total rows (each row = one student response)
+  var totalRespondents = rows.length;
+
+  var overallQ3 = avgQ(q3col);
+
+  return {
+    totalRows: rows.length,
+    totalRespondents: totalRespondents,
+    totalTerms: allTerms.length,
+    allTerms: allTerms,
+    lastTwoTerms: lastTwoTerms,
+    termData: termData,
+    overallQ3: overallQ3,
+    recentQ3: recentAvg,
+    trend: trend,
+    instrAvgs: instrAvgs,
+    courseAvgs: courseAvgs,
+    strengths: strengths,
+    improvements: improvements
+  };
+}
+
+// ── RENDER EVALUATIONS TAB ──
+function renderEvals(el, duid, idx) {
+  if (!duid || !S.evalByDUID[duid] || !S.evalByDUID[duid].length) {
+    el.innerHTML = '<div class="eval-no-data">No evaluation data found for this instructor.<br><small>DU ID: ' + esc(duid||'unknown') + '</small></div>';
+    return;
+  }
+  var ev = buildEvalSummary(duid);
+  var html = '';
+
+  // Score color helper (6-point scale: 5.0+ = good, 4.5-5.0 = warn, <4.5 = bad)
+  function scoreColor(v) { return v === null ? '' : v >= 5.0 ? 'good' : v >= 4.5 ? 'warn' : 'bad'; }
+  function fmt(v) { return v === null ? 'N/A' : v.toFixed(2); }
+  var trendIcon = ev.trend === 'up' ? '&#8599; Improving' : ev.trend === 'down' ? '&#8600; Declining' : '&#8594; Stable';
+  var trendColor = ev.trend === 'up' ? 'var(--green)' : ev.trend === 'down' ? 'var(--crimson)' : 'var(--ink-faint)';
+
+  // Low response rate detection (< 40% threshold)
+  var LOW_RESP_THRESHOLD = 40;
+  var lowRespTerms = ev.termData.filter(function(t) { return t.responseRate !== null && t.responseRate < LOW_RESP_THRESHOLD; });
+  var hasLowResp = lowRespTerms.length > 0;
+
+  // Summary stats
+  html += '<div class="eval-section-title">Summary</div>';
+  html += '<div class="eval-summary-grid">';
+  html += '<div class="eval-stat-card"><div class="eval-stat-n ' + scoreColor(ev.overallQ3) + '">' + fmt(ev.overallQ3) + '<span style="font-size:12px;color:var(--ink-faint)"> /6</span></div><div class="eval-stat-l">Overall Effectiveness (Q3)</div></div>';
+  html += '<div class="eval-stat-card"><div class="eval-stat-n ' + scoreColor(ev.recentQ3) + '">' + fmt(ev.recentQ3) + '<span style="font-size:12px;color:var(--ink-faint)"> /6</span></div><div class="eval-stat-l">Recent Q3 (last 4 terms)</div></div>';
+  html += '<div class="eval-stat-card"><div class="eval-stat-n" style="color:' + trendColor + '">' + trendIcon + '</div><div class="eval-stat-l">Trend</div></div>';
+  html += '<div class="eval-stat-card"><div class="eval-stat-n">' + ev.totalTerms + '</div><div class="eval-stat-l">Terms Taught</div></div>';
+  html += '<div class="eval-stat-card"><div class="eval-stat-n">' + ev.totalRespondents + '</div><div class="eval-stat-l">Total Respondents</div></div>';
+  html += '</div>';
+
+  // Low response rate banner
+  if (hasLowResp) {
+    html += '<div style="background:var(--amber-bg);border:1px solid #e8c878;border-radius:8px;padding:10px 14px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start">' +
+      '<span style="font-size:15px;flex-shrink:0">&#9888;</span>' +
+      '<div><div style="font-size:12px;font-weight:600;color:var(--amber);margin-bottom:3px">Low Response Rate — Interpret Scores with Caution</div>' +
+      '<div style="font-size:12px;color:var(--ink-mid);line-height:1.55">' +
+      lowRespTerms.map(function(t) { return esc(t.label) + ': ' + t.responseRate.toFixed(0) + '% (' + t.respondents + ' respondent' + (t.respondents !== 1 ? 's' : '') + ')'; }).join(' &nbsp;&middot;&nbsp; ') +
+      '<br>Terms with response rates below 40% may not reflect the full student experience. Scores from these terms should not be used as sole evidence of teaching quality and should be weighted accordingly in the rank assessment.</div>' +
+      '</div></div>';
+  }
+
+  // Term by term Q3
+  html += '<div class="eval-section-title">Q3 — Overall Effectiveness by Term</div>';
+  html += '<table class="eval-term-table"><thead><tr><th>Term</th><th>Score / 6</th><th></th><th>Respondents</th><th>Resp. Rate</th><th>Courses</th></tr></thead><tbody>';
+  ev.termData.forEach(function(t) {
+    var sc = t.avg;
+    var cls = sc === null ? '' : sc >= 5.0 ? 'good' : sc >= 4.5 ? 'warn' : 'bad';
+    var pct = sc ? Math.round((sc/6)*100) : 0;
+    var isRecent = ev.lastTwoTerms.indexOf(t.term) >= 0;
+    var isLowResp = t.responseRate !== null && t.responseRate < LOW_RESP_THRESHOLD;
+    html += '<tr' + (isRecent ? ' style="background:#fffdf0"' : '') + '>' +
+      '<td style="white-space:nowrap">' + esc(t.label) +
+        (isRecent ? ' <span style="font-size:9px;color:var(--amber);font-weight:600">RECENT</span>' : '') +
+      '</td>' +
+      '<td><span style="font-weight:600;color:var(--' + (cls==='good'?'green':cls==='warn'?'amber':'crimson') + ')">' + (sc ? sc.toFixed(2) : 'N/A') + '</span></td>' +
+      '<td><div class="eval-score-bar"><div class="eval-score-bar-bg"><div class="eval-score-bar-fill" style="width:' + pct + '%;background:var(--' + (cls==='good'?'green':cls==='warn'?'amber':'crimson') + ')"></div></div></div></td>' +
+      '<td>' + t.respondents + '</td>' +
+      '<td>' + (t.responseRate !== null ? '<span style="' + (isLowResp ? 'color:var(--amber);font-weight:600' : '') + '">' + t.responseRate.toFixed(0) + '%' + (isLowResp ? ' &#9888;' : '') + '</span>' : 'N/A') + '</td>' +
+      '<td style="font-size:11px;color:var(--ink-faint)">' + esc(t.courses.join(', ').substring(0,60)) + '</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table>';
+
+  // Instructor question averages
+  html += '<div class="eval-section-title">Instructor Questions — All-Time Averages</div>';
+  html += '<div class="eval-q-grid">';
+  INSTRUCTOR_QS.forEach(function(q) {
+    var v = ev.instrAvgs[q.col];
+    var cls = v === null ? '' : v >= 5.0 ? 'good' : v >= 4.5 ? 'warn' : 'bad';
+    html += '<div class="eval-q-row"><div class="eval-q-label">' + esc(q.label) + '</div><div class="eval-q-score ' + cls + '">' + (v ? v.toFixed(2) : 'N/A') + ' <span style="font-size:10px;font-weight:400;color:var(--ink-faint)">/6</span></div></div>';
+  });
+  html += '</div>';
+
+  // Course question averages
+  html += '<div class="eval-section-title">Course Questions — All-Time Averages</div>';
+  html += '<div class="eval-q-grid">';
+  COURSE_QS.forEach(function(q) {
+    var v = ev.courseAvgs[q.col];
+    var cls = v === null ? '' : v >= 5.0 ? 'good' : v >= 4.5 ? 'warn' : 'bad';
+    html += '<div class="eval-q-row"><div class="eval-q-label">' + esc(q.label) + '</div><div class="eval-q-score ' + cls + '">' + (v ? v.toFixed(2) : 'N/A') + ' <span style="font-size:10px;font-weight:400;color:var(--ink-faint)">/6</span></div></div>';
+  });
+  html += '</div>';
+
+  // Qualitative comments section
+  var hasComments = ev.strengths.length > 0 || ev.improvements.length > 0;
+  var totalComments = ev.strengths.length + ev.improvements.length;
+
+  // Check for pre-computed synthesis
+  var row = S.rows[idx];
+  var duid2 = row ? String(parseInt((row['DU ID'] || '0'), 10)).trim() : '';
+  var presynth = S.synthByDUID[duid2] || null;
+
+  html += '<div class="eval-section-title" style="margin-top:4px">Student Comment Synthesis — Q22 &amp; Q23</div>';
+
+  if (presynth && presynth.synthesis) {
+    // Show pre-computed synthesis
+    html += '<div style="background:var(--blue-bg);border:1px solid #b8d0e8;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:12px;color:var(--blue);font-weight:600">Pre-computed synthesis &mdash; ' + esc(presynth.termsCovered) + ' &mdash; ' + presynth.q22Count + ' strength comments, ' + presynth.q23Count + ' improvement comments</div>';
+    if (presynth.dataFlag) {
+      html += '<div class="flag-item" style="margin-bottom:10px"><span class="flag-icon">&#9888;</span><span>' + esc(presynth.dataFlag) + '</span></div>';
+    }
+    html += '<div style="background:white;border:1px solid var(--rule);border-radius:8px;padding:16px;white-space:pre-wrap;font-size:13px;color:var(--ink-mid);line-height:1.65">' + esc(presynth.synthesis) + '</div>';
+  } else if (!hasComments) {
+    html += '<div class="eval-no-data" style="padding:20px">No student comments found for the last 2 terms.</div>';
+  } else {
+    html += '<div id="evalCommentArea-' + idx + '">';
+    html += '<div style="display:flex;align-items:center;gap:14px;background:white;border:1px solid var(--rule);border-radius:8px;padding:14px 16px;margin-bottom:4px">';
+    html += '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--ink)">' + totalComments + ' student comments across last 2 terms</div>';
+    html += '<div style="font-size:12px;color:var(--ink-faint);margin-top:3px">' + ev.strengths.length + ' strengths (Q22) &nbsp;&middot;&nbsp; ' + ev.improvements.length + ' recommendations (Q23)</div></div>';
+    html += '<button class="btn-run-ai" onclick="synthesizeComments(' + idx + ')" id="synthBtn-' + idx + '">Synthesize with AI</button>';
+    html += '</div>';
+    html += '<div id="synthResult-' + idx + '"></div>';
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+// ── SYNTHESIZE Q22/Q23 COMMENTS ──
+function synthesizeComments(idx) {
+  var row = S.rows[idx];
+  if (!row) return;
+  var duid = String(parseInt((row['DU ID'] || '0'), 10) || '').trim();
+  var ev = buildEvalSummary(duid);
+  if (!ev) return;
+
+  var btn = document.getElementById('synthBtn-' + idx);
+  var resultEl = document.getElementById('synthResult-' + idx);
+  if (!btn || !resultEl) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Analyzing...';
+
+  // Use cached result if available
+  if (S.rows[idx]._commentSynthesis) {
+    renderCommentSynthesis(resultEl, S.rows[idx]._commentSynthesis);
+    btn.disabled = false;
+    btn.textContent = 'Re-synthesize';
+    return;
+  }
+
+  resultEl.innerHTML = '<div class="ai-loading" style="padding:24px"><div class="ai-spinner"></div><div class="ai-loading-msg">Reading student comments through the APS lens...</div></div>';
+
+  var name = ((row['RecipientFirstName']||'') + ' ' + (row['RecipientLastName']||'')).trim();
+
+  var strengthsText = ev.strengths.map(function(c) { return '[' + c.term + '] ' + c.text; }).join('\n\n');
+  var improvementsText = ev.improvements.map(function(c) { return '[' + c.term + '] ' + c.text; }).join('\n\n');
+
+  var prompt = 'You are analyzing student course evaluation comments for a faculty rank assessment at the University of Denver College of Professional Studies (PSC).\n\n' +
+
+    'FACULTY MEMBER: ' + name + '\n' +
+    'TERMS COVERED: Last 2 terms they taught (' + ev.lastTwoTerms.map(termLabel).join(', ') + ')\n' +
+    'TOTAL COMMENTS: ' + (ev.strengths.length + ev.improvements.length) + '\n\n' +
+
+    'APS RUBRIC PILLARS FOR REFERENCE:\n' +
+    '- Teaching Excellence (70%): student connection, course presence, industry expertise integration, grading/feedback quality\n' +
+    '- Service (20%): curriculum contribution, industry connections, experiential learning, college engagement\n' +
+    '- Scholarship (10%): relevancy/currency, presentations/publications, research/grants\n\n' +
+
+    'APS P&P KEY REQUIREMENTS:\n' +
+    '- Instructors must integrate active industry expertise into teaching\n' +
+    '- Feedback must be timely (within 7 days) and growth-oriented\n' +
+    '- Active engagement in discussions and student mentoring\n' +
+    '- Inclusive learning environment\n\n' +
+
+    'Q22 STUDENT STRENGTHS COMMENTS:\n' + (strengthsText || 'None provided') + '\n\n' +
+    'Q23 STUDENT IMPROVEMENT RECOMMENDATIONS:\n' + (improvementsText || 'None provided') + '\n\n' +
+
+    'Please provide a structured synthesis that:\n' +
+    '1. Identifies the top 3 recurring strength themes, mapped to specific APS rubric criteria\n' +
+    '2. Identifies the top 3 recurring improvement themes, mapped to specific APS rubric criteria\n' +
+    '3. Notes any patterns that are particularly relevant to rank determination\n' +
+    '4. Flags any concerns that should be addressed in a support plan\n\n' +
+
+    'Format as JSON only, no markdown:\n' +
+    '{\n' +
+    '  "strengthThemes": [\n' +
+    '    { "theme": "<theme title>", "rubricConnection": "<which pillar/criterion>", "evidence": "<1-2 representative student quotes or paraphrases>", "frequency": "frequent|occasional|rare" },\n' +
+    '    ...\n' +
+    '  ],\n' +
+    '  "improvementThemes": [\n' +
+    '    { "theme": "<theme title>", "rubricConnection": "<which pillar/criterion>", "evidence": "<1-2 representative student quotes or paraphrases>", "frequency": "frequent|occasional|rare" },\n' +
+    '    ...\n' +
+    '  ],\n' +
+    '  "rankRelevantPatterns": "<2-3 sentences about what these comments suggest for rank assessment>",\n' +
+    '  "supportPlanFlags": ["<any specific concerns worth flagging>"]\n' +
+    '}';
+
+  fetch('https://dark-credit-4434.bobbie-kite.workers.dev', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 6000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    var text = '';
+    data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
+    text = text.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/```\s*$/,'').trim();
+    var result = JSON.parse(text);
+
+    // Cache on the row
+    S.rows[idx]._commentSynthesis = result;
+    renderCommentSynthesis(resultEl, result);
+
+    btn.disabled = false;
+    btn.textContent = 'Re-synthesize';
+  })
+  .catch(function(err) {
+    resultEl.innerHTML = '<div style="padding:12px;color:var(--crimson);font-size:12px">Synthesis failed: ' + esc(String(err)) + '</div>';
+    btn.disabled = false;
+    btn.textContent = 'Retry';
+  });
+}
+
+function renderCommentSynthesis(el, result) {
+  var freqColor = { frequent: 'var(--crimson)', occasional: 'var(--amber)', rare: 'var(--ink-faint)' };
+  var html = '<div style="margin-top:12px">';
+
+  // Strength themes
+  if (result.strengthThemes && result.strengthThemes.length) {
+    html += '<div class="eval-section-title" style="color:var(--green);margin-bottom:10px">&#10003; Recurring Strengths</div>';
+    result.strengthThemes.forEach(function(t) {
+      html += '<div class="eval-comment-block" style="border-left:3px solid var(--green)">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
+          '<strong style="font-size:13px">' + esc(t.theme) + '</strong>' +
+          '<span style="font-size:10px;font-weight:600;color:' + (freqColor[t.frequency]||'var(--ink-faint)') + '">' + esc(t.frequency||'') + '</span>' +
+        '</div>' +
+        '<div style="font-size:11px;font-weight:600;color:var(--green);margin-bottom:4px">&#8594; ' + esc(t.rubricConnection) + '</div>' +
+        '<div class="eval-comment-text">' + esc(t.evidence) + '</div>' +
+      '</div>';
+    });
+  }
+
+  // Improvement themes
+  if (result.improvementThemes && result.improvementThemes.length) {
+    html += '<div class="eval-section-title" style="color:var(--amber);margin-top:16px;margin-bottom:10px">&#9651; Areas for Growth</div>';
+    result.improvementThemes.forEach(function(t) {
+      html += '<div class="eval-comment-block" style="border-left:3px solid var(--amber)">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:6px">' +
+          '<strong style="font-size:13px">' + esc(t.theme) + '</strong>' +
+          '<span style="font-size:10px;font-weight:600;color:' + (freqColor[t.frequency]||'var(--ink-faint)') + '">' + esc(t.frequency||'') + '</span>' +
+        '</div>' +
+        '<div style="font-size:11px;font-weight:600;color:var(--amber);margin-bottom:4px">&#8594; ' + esc(t.rubricConnection) + '</div>' +
+        '<div class="eval-comment-text">' + esc(t.evidence) + '</div>' +
+      '</div>';
+    });
+  }
+
+  // Rank relevant patterns
+  if (result.rankRelevantPatterns) {
+    html += '<div style="background:var(--blue-bg);border:1px solid #b8d0e8;border-radius:7px;padding:12px 14px;margin-top:12px">' +
+      '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--blue);margin-bottom:5px">Rank Assessment Relevance</div>' +
+      '<div style="font-size:13px;color:var(--ink-mid);line-height:1.55">' + esc(result.rankRelevantPatterns) + '</div>' +
+    '</div>';
+  }
+
+  // Support plan flags
+  if (result.supportPlanFlags && result.supportPlanFlags.filter(Boolean).length) {
+    html += '<div style="margin-top:10px">';
+    result.supportPlanFlags.filter(Boolean).forEach(function(f) {
+      html += '<div class="flag-item"><span class="flag-icon">&#9888;</span><span>' + esc(f) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ── GENERATE FOLLOW-UP INTERVIEW QUESTIONS (borderline cases only) ──
+function generateFollowUpQuestions(idx, onComplete) {
+  var row = S.rows[idx];
+  if (!row || !row._aiResult) { if (onComplete) onComplete(); return; }
+  if (!row._aiResult.stage3Recommended && (row._aiResult.confidence || 0) >= 80) { if (onComplete) onComplete(); return; }
+
+  // Already cached
+  if (row._followUpQuestions) { if (onComplete) onComplete(); return; }
+
+  var r = row._aiResult;
+  var name = ((row['RecipientFirstName']||'') + ' ' + (row['RecipientLastName']||'')).trim();
+  var rankRec = r.recommendedRank || 'Adjunct Assistant Professor';
+  var _rr = rankRec.toLowerCase();
+  var rankKey = (_rr.indexOf('associate') < 0 && _rr.indexOf('assistant') < 0 && _rr.indexOf('professor') >= 0) ? 'full'
+    : _rr.indexOf('associate') >= 0 ? 'associate' : 'assistant';
+  var targetRank = rankKey === 'associate' ? 'Adjunct Professor (Full)' : 'Adjunct Associate Professor';
+
+  // Build a concise summary of the gaps that made this borderline
+  var flagSummary = (r.flags || []).filter(Boolean).join('\n');
+  var critSummary = (r.criteria || []).map(function(c) {
+    return c.name + ' (' + c.pillar + '): score ' + c.score + ' — ' + (c.rationale || '');
+  }).join('\n');
+
+  var prompt = 'You are preparing targeted interview follow-up questions for a borderline faculty rank candidate at the University of Denver College of Professional Studies (PSC).\n\n' +
+    'CANDIDATE: ' + name + '\n' +
+    'AI PRELIMINARY RECOMMENDATION: ' + rankRec + ' (confidence: ' + (r.confidence||0) + '%)\n' +
+    'BORDERLINE SCENARIO: Candidate is on the cusp between ' + rankRec + ' and ' + targetRank + '\n' +
+    'SUMMARY: ' + (r.summary||'') + '\n' +
+    'WHY THIS RANK: ' + (r.whyThisRank||'') + '\n\n' +
+    'FLAGS AND GAPS FROM ASSESSMENT:\n' + (flagSummary || 'None noted') + '\n\n' +
+    'CRITERIA SCORES:\n' + critSummary + '\n\n' +
+    'APS RANK THRESHOLDS FOR CONTEXT:\n' +
+    'Associate: Active industry engagement; grows connections; creates at least 1 experiential learning opportunity per cycle; participates on at least 1 committee or governance body; 2+ PD activities; scholarship criteria met (presentations/publications, research/applied work).\n' +
+    'Full: Broad sustained active network; consistently expands experiential learning with documented student career impact; leads curriculum committee or holds external leadership roles; multiple PD contributions; recognized scholarship.\n\n' +
+    'Generate 4-6 targeted interview questions designed to resolve the specific ambiguities that made this candidate borderline. Each question should:\n' +
+    '1. Address a specific gap, ambiguity, or low-confidence criterion from the assessment\n' +
+    '2. Be open-ended and allow the candidate to provide concrete evidence\n' +
+    '3. Be framed respectfully — these are accomplished professionals\n' +
+    '4. Be organized by the gap or criterion it is designed to clarify\n\n' +
+    'Respond ONLY with valid JSON, no markdown:\n' +
+    '{\n' +
+    '  "borderlineScenario": "<1 sentence: what the key decision is, e.g. Assistant vs Associate>",\n' +
+    '  "questions": [\n' +
+    '    {\n' +
+    '      "gap": "<brief label of the gap or criterion being probed, e.g. Experiential Learning Evidence>",\n' +
+    '      "question": "<the full interview question>",\n' +
+    '      "whatToListenFor": "<1 sentence on what a strong answer looks like vs a weak one>"\n' +
+    '    }\n' +
+    '  ]\n' +
+    '}';
+
+  fetch('https://dark-credit-4434.bobbie-kite.workers.dev', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 2000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+    var text = '';
+    data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
+    text = text.replace(/^```json\s*/i,'').replace(/^```\s*/i,'').replace(/```\s*$/,'').trim();
+    var result = JSON.parse(text);
+    S.rows[idx]._followUpQuestions = result;
+    if (onComplete) onComplete();
+  })
+  .catch(function() {
+    // Silently fail — Word doc will just omit the section
+    if (onComplete) onComplete();
+  });
+}
+function buildEvalPromptText(duid) {
+  if (!duid || !S.evalByDUID[duid]) return 'No evaluation data available.';
+  var ev = buildEvalSummary(duid);
+  if (!ev) return 'No evaluation data available.';
+
+  var text = 'COURSE EVALUATION DATA (6-point scale, threshold: 5.0+ for Associate/Full):\n';
+  text += 'Total terms taught: ' + ev.totalTerms + ' | Total respondents: ' + ev.totalRespondents + '\n';
+  text += 'Overall Q3 (effective instructor) all-time average: ' + (ev.overallQ3 ? ev.overallQ3.toFixed(2) : 'N/A') + '/6\n';
+  text += 'Recent Q3 (last 4 terms): ' + (ev.recentQ3 ? ev.recentQ3.toFixed(2) : 'N/A') + '/6\n';
+  text += 'Score trend: ' + ev.trend + '\n\n';
+
+  // Flag low response rate terms for the AI
+  var LOW_RESP_AI = 40;
+  var lowRespAI = ev.termData.filter(function(t) { return t.responseRate !== null && t.responseRate < LOW_RESP_AI; });
+  if (lowRespAI.length > 0) {
+    text += 'LOW RESPONSE RATE WARNING — the following terms have response rates below 40% and their scores carry reduced statistical reliability:\n';
+    lowRespAI.forEach(function(t) {
+      text += '  ' + t.label + ': ' + t.responseRate.toFixed(0) + '% response rate (' + t.respondents + ' respondent' + (t.respondents !== 1 ? 's' : '') + ') — score: ' + (t.avg ? t.avg.toFixed(2) : 'N/A') + '\n';
+    });
+    text += 'INSTRUCTION: Do not use scores from low response rate terms as primary evidence for or against a rank recommendation. Note the limitation in your evalHighlights and flags rather than treating the score at face value. A single poor or outlier score from a low-response term should not block an otherwise strong candidate.\n\n';
+  }
+
+  text += 'Q3 by term:\n';
+  ev.termData.forEach(function(t) {
+    text += '  ' + t.label + ': ' + (t.avg ? t.avg.toFixed(2) : 'N/A') + ' (n=' + t.respondents + ', ' + t.responseRate.toFixed(0) + '% response rate' + (t.responseRate < LOW_RESP_AI ? ' — LOW, see warning above' : '') + ')\n';
+  });
+
+  text += '\nInstructor question averages (all-time):\n';
+  INSTRUCTOR_QS.forEach(function(q) {
+    var v = ev.instrAvgs[q.col];
+    text += '  ' + q.label + ': ' + (v ? v.toFixed(2) : 'N/A') + '/6\n';
+  });
+
+  text += '\nCourse question averages (all-time):\n';
+  COURSE_QS.forEach(function(q) {
+    var v = ev.courseAvgs[q.col];
+    text += '  ' + v ? v.toFixed(2) : 'N/A' + '/6\n';
+  });
+
+  // Add pre-computed synthesis if available
+  var synth = S.synthByDUID[duid];
+  if (synth && synth.synthesis) {
+    var synthTrimmed = synth.synthesis.length > 2000 ? synth.synthesis.substring(0, 2000) + '...[truncated for length]' : synth.synthesis;
+    text += '\nSTUDENT COMMENT SYNTHESIS (pre-computed from Q22/Q23, terms: ' + synth.termsCovered + ', ' + synth.q22Count + ' strength comments, ' + synth.q23Count + ' improvement comments):\n\n';
+    text += synthTrimmed + '\n\n';
+    text += 'SYNTHESIS WEIGHTING GUIDANCE:\n';
+    text += '- Teaching Excellence comment patterns are primary evidence (70% weight).\n';
+    text += '- Service/Scholarship comment patterns are additive only at borderline decisions — never penalize their absence.\n';
+    text += '- Rank thresholds still apply regardless of comment patterns.\n';
+    if (synth.dataFlag) text += 'DATA FLAG: ' + synth.dataFlag + '\n';
+  }
+
+  return text;
+}
+function switchTab(tab) {
+  var body = document.getElementById('overlayBody');
+  document.getElementById('tab-both').classList.remove('active');
+  document.getElementById('tab-evals').classList.remove('active');
+  document.getElementById('tab-ai').classList.remove('active');
+  document.getElementById('btnDownloadAssessment').style.display = 'none';
+  document.getElementById('btnDownloadWord').style.display = 'none';
+
+  if (tab === 'both') {
+    body.className = 'overlay-body view-both';
+    document.getElementById('tab-both').classList.add('active');
+  } else if (tab === 'evals') {
+    body.className = 'overlay-body view-evals';
+    document.getElementById('tab-evals').classList.add('active');
+    var evEl = document.getElementById('ovEvals');
+    if (evEl.dataset.idx !== String(S.currentReviewIdx)) {
+      evEl.dataset.idx = String(S.currentReviewIdx);
+      var row = S.rows[S.currentReviewIdx];
+      var duid = row ? String(parseInt((row['DU ID'] || '0'), 10)).trim() : '';
+      renderEvals(evEl, duid, S.currentReviewIdx);
+    }
+  } else {
+    body.className = 'overlay-body view-ai';
+    document.getElementById('tab-ai').classList.add('active');
+    var aiEl = document.getElementById('ovAI');
+    var hasResult = S.rows[S.currentReviewIdx] && S.rows[S.currentReviewIdx]._aiResult;
+    var alreadyRendered = aiEl.dataset.idx === String(S.currentReviewIdx) && aiEl.innerHTML.trim() !== '';
+    if (!alreadyRendered) {
+      runAIAssessment(S.currentReviewIdx);
+    } else {
+      document.getElementById('btnDownloadAssessment').style.display = 'inline-block';
+      document.getElementById('btnDownloadWord').style.display = 'inline-block';
+    }
+  }
+}
+
+// ── BUILD ASSESSMENT PROMPT ──
+function buildPrompt(row) {
+  var name = ((row['RecipientFirstName'] || '') + ' ' + (row['RecipientLastName'] || '')).trim();
+  var duid = String(parseInt((row['DU ID'] || '0'), 10) || '').trim();
+
+  var surveyText = '';
+  QCOLS.forEach(function(q) {
+    var val = row[q.k] || '';
+    var label = (S.labels[q.k] || q.f).split('\n')[0].trim();
+    surveyText += label + ': ' + (val || 'No response') + '\n';
+  });
+
+  var evalText = buildEvalPromptText(duid);
+
+  return 'You are an expert faculty evaluator for the University of Denver College of Professional Studies (PSC), performing an INITIAL rank assessment for the Adjunct Professorial Series (APS).\n\n' +
+
+    'DATA SOURCES: You have (1) self-reported survey responses, (2) course evaluation scores and pre-computed student comment synthesis, and (3) the candidate\'s CV as a PDF document. Read the CV carefully — it is the authoritative source for industry credentials, scholarship, and professional network evidence.\n\n' +
+
+    '═══ RANK DECISION RULES — READ AND APPLY BEFORE SCORING ═══\n\n' +
+
+    'BATCH INDEPENDENCE: You are evaluating ONE candidate. You have no knowledge of any other candidates in this cohort. Do not anchor, calibrate, or adjust your recommendation based on any prior assessment. Each candidate is evaluated entirely on their own evidence against the fixed rubric criteria below.\n\n' +
+
+    'DEFAULT TO ASSISTANT: Adjunct Assistant Professor is the correct starting rank. Only move up when there is clear, specific, documented evidence meeting the criteria for a higher rank. When evidence is ambiguous or absent, stay at the lower rank and flag the gap — do not give the benefit of the doubt upward.\n\n' +
+
+    'WHEN TO STAY AT ASSISTANT — recommend Assistant if ANY of the following are true:\n' +
+    '  - Eval Q3 is below 4.5 (or unavailable)\n' +
+    '  - Industry Connections & Experiential Learning (Criterion 7) scores 1 or 2\n' +
+    '  - No documented student-facing experiential learning opportunities (guest speakers arranged, site visits, internship connections, project partnerships)\n' +
+    '  - Service pillar overall scores 2 or below with no mitigating evidence\n' +
+    '  - Candidate is new to PSC with no track record of creating student value beyond direct instruction\n' +
+    'Strong scholarship or an impressive CV does NOT override a weak service floor. A brilliant industry expert who has not yet created value for PSC students beyond teaching their courses is an Assistant.\n\n' +
+
+    'WHEN TO STAY AT ASSOCIATE — recommend Associate (not Full) if ANY of the following are true:\n' +
+    '  - Experiential learning exists but is limited to one-off actions with no documented pattern or student career impact\n' +
+    '  - Industry network is described but not demonstrably leveraged for student benefit at scale\n' +
+    '  - Curriculum contribution is limited to individual assigned courses only\n' +
+    '  - No external leadership roles documented (editorial boards, professional org officer, advisory groups)\n' +
+    '  - Scholarship is solid but not consistently recognized at regional or national level\n\n' +
+
+    'SERVICE FLOOR — NON-NEGOTIABLE:\n' +
+    'Criterion 7 (Industry Connections & Experiential Learning) is the defining difference between Assistant and Associate.\n' +
+    '  - Criterion 7 scores 1 or 2 → recommendedRank MUST be Adjunct Assistant Professor. No exceptions.\n' +
+    '  - Criterion 7 scores 3 → Associate is eligible if other criteria support it.\n' +
+    '  - Criterion 7 scores 4 → Full is eligible if other criteria support it.\n\n' +
+
+    'CRITICAL INSTRUCTIONS:\n' +
+    '- This is an INITIAL appointment. No one has had the opportunity to do PSC committee work, formal curriculum process steps, or CoP participation yet.\n' +
+    '- Start at Assistant and only move up when there is clear evidence meeting the criteria for the higher rank.\n' +
+    '- NEVER flag low student evaluation response rates — instructors have zero control over this.\n' +
+    '- NEVER penalize Service or Scholarship based on absence of student comments in those areas.\n' +
+    '- Scholarship criteria (Presentations/Publications and Research/Grant) are N/A ONLY when recommending Assistant rank. If recommending Associate or Full, score all scholarship criteria.\n' +
+    '- These are adjunct faculty whose primary identity is as industry professionals, not academics. Scholarship includes industry research, applied research, white papers, keynotes, patents, grant work, and practitioner publications — not only peer-reviewed academic journals.\n' +
+    '- CV evidence outweighs self-reported survey answers. If the survey says something the CV does not corroborate, flag the discrepancy rather than accepting the claim.\n' +
+    '- College & Program Engagement: treat as a confirming signal for Full at initial appointment, not a blocking criterion. Check CV for external leadership roles (professional organizations, editorial boards, advisory groups).\n\n' +
+
+    'CONFIDENCE CALIBRATION — be honest, not uniformly high:\n' +
+    '- 85-90%: Evidence is clear and unambiguous in both directions. Criteria clearly met or clearly not met.\n' +
+    '- 70-80%: Most criteria are clear but 1-2 are borderline or unverified.\n' +
+    '- 55-70%: Genuinely borderline — candidate could reasonably go either way. Flag for human review and Stage 3 clarification.\n' +
+    '- Below 55%: Significant evidence gaps. Do not guess — stay at lower rank and flag what is missing.\n\n' +
+
+    'RATING SCALE: 4=Exceeds, 3=Meets, 2=Needs Improvement, 1=Unsatisfactory, N/A=Not Applicable\n' +
+    'RUBRIC WEIGHTS: Teaching Excellence 70%, Service 20%, Scholarship 10%\n\n' +
+
+    '═══ TEACHING EXCELLENCE (70%) ═══\n\n' +
+
+    'CRITERION 1 — Connect with Students\n' +
+    '  Data: Survey Q9/Q14/Q35, Eval Q19/Q20, Synthesis teaching themes\n' +
+    '  Assistant: Responsive communication; builds basic community\n' +
+    '  Associate: Proactive, intentional; anticipates student needs; mentors students; facilitates peer connections\n' +
+    '  Full: Models exemplary communication; cultivates learning community; deep sustained mentoring\n' +
+    '  Note: Trust self-report at initial appointment. LMS data not yet available.\n\n' +
+
+    'CRITERION 2 — Be Present\n' +
+    '  Data: Survey Q9/Q10, Eval Q13/Q20, Synthesis themes on presence\n' +
+    '  Assistant: Regular presence; responds and participates; varied instructional approaches\n' +
+    '  Associate: Consistent proactive presence; initiates/enriches discussions; innovative pedagogy\n' +
+    '  Full: Sustained exemplary presence; models and elevates discourse\n' +
+    '  Note: Login frequency not available at initial appointment. Use Eval Q20 and survey.\n\n' +
+
+    'CRITERION 3 — Bring Industry Expertise\n' +
+    '  Data: Survey Q5/Q6/Q12/Q23, Eval Q3 (threshold)/Q14/Q15, CV (role/credentials/recognition)\n' +
+    '  Assistant: Eval Q3 >= 4.5; integrates professional background into instruction\n' +
+    '  Associate: Eval Q3 >= 5.0; actively leverages industry connections to enrich student experience\n' +
+    '  Full: Eval Q3 >= 5.0 consistently; strategically leverages broad network to substantially enhance programming\n' +
+    '  Note: CV is PRIMARY source for industry engagement verification. Eval Q3 is a threshold signal, not sole determinant. Do NOT flag low response rates. For Full rank eval consideration, a strong recent trend (last 2-4 terms) matters more than a lower all-time average that includes older terms.\n\n' +
+
+    'CRITERION 4 — Take Ownership\n' +
+    '  Data: Survey Q13/Q15/Q16/Q17, Eval Q18 (timeliness)/Q19 (quality), Synthesis feedback themes\n' +
+    '  Assistant: Feedback within 6 days; keeps course current; open to feedback\n' +
+    '  Associate: Feedback connects to learning outcomes; proactively updates content; reflects and adapts\n' +
+    '  Full: Forward-looking feedback; exemplary course quality; models continuous improvement\n\n' +
+
+    '═══ SERVICE (20%) ═══\n\n' +
+
+    'CRITERION 5 — Professional Development\n' +
+    '  Data: Survey Q9/Q17, CV (certifications/training/conferences/professional memberships)\n' +
+    '  Assistant: At least 1 PD or upskilling opportunity per cycle\n' +
+    '  Associate: At least 2 PD activities per cycle; contributes ideas for needed trainings\n' +
+    '  Full: Multiple PD activities; contributes to and leads PD initiatives\n' +
+    '  Note: Count any professional development — certifications, conferences, workshops, executive education, professional org involvement. Be lenient at initial appointment.\n\n' +
+
+    'CRITERION 6 — Curriculum Contribution\n' +
+    '  Data: Survey Q13/Q20, CV (curriculum/course design experience)\n' +
+    '  Assistant: Identifies and makes minor course updates\n' +
+    '  Associate: Completes course updates or curriculum modifications on assigned courses\n' +
+    '  Full: Contributes to program-level curriculum work across courses\n' +
+    '  Note: Full formal process steps (kickoff/plan/report) not required at initial appointment.\n\n' +
+
+    'CRITERION 7 — Industry Connections & Experiential Learning\n' +
+    '  Data: Survey Q21/Q23/Q33, Eval Q5/Q6, CV (industry network/affiliations/partnerships)\n' +
+    '  Assistant: Maintains active industry connections relevant to teaching area; minimum 5 years discipline-specific experience documented\n' +
+    '  Associate THRESHOLD: Must show (a) active, growing industry network AND (b) evidence of at least one experiential learning opportunity created per appointment cycle — e.g., guest speaker, site visit, internship connection, or project partnership. A candidate without any documented experiential learning creation should not advance to Associate on this criterion alone.\n' +
+    '  Full THRESHOLD: Must show (a) a broad, sustained active industry network with documented reach AND (b) consistent, expanding experiential learning opportunities with evidence of impact on student career outcomes or placement. Intent or plans are not sufficient at Full — look for documented results.\n' +
+    '  Note: At initial appointment, documented past practice (CV evidence of internship placement, guest lectures arranged, employer partnerships) counts as meeting the threshold. For Associate, strong network with clear intent and at least one concrete example is sufficient. For Full, multiple documented examples across different terms or courses are expected.\n\n' +
+
+    'CRITERION 8 — College & Program Engagement\n' +
+    '  Data: Survey Q19/Q20/Q21, CV (committee memberships/professional org leadership roles)\n' +
+    '  Assistant: Aware of PSC initiatives; attends or watches program/college meeting recordings\n' +
+    '  Associate: Participates on at least 1 curriculum committee, industry advisory group, or governance body\n' +
+    '  Full: Leads curriculum committee or holds leadership roles in professional organizations, editorial boards, conference planning, or college governance\n' +
+    '  Note: No PSC committee work expected at initial appointment. For Associate, any external committee counts. For Full, check CV for external leadership — this is a confirming signal, not a blocking criterion. Active participation on MULTIPLE PSC committees (e.g. Curriculum Committee + Faculty Review Committee + program committee) at initial appointment is exceptional and confirms Full-level engagement.\n\n' +
+
+    '═══ SCHOLARSHIP (10%) ═══\n' +
+    'IMPORTANT: Scholarship is N/A ONLY if recommending Assistant rank. Score all three criteria for Associate and Full.\n\n' +
+    'CRITICAL — FIELD-SENSITIVE EVALUATION: Scholarship must be evaluated relative to what is normal in the candidate\'s specific discipline. Do NOT apply a single academic lens across all fields.\n\n' +
+    'FIELD EXAMPLES:\n' +
+    '  - CREATIVE WRITING/LITERARY ARTS: Published books, chapbooks, anthologies, literary journals, editorial roles, poet laureate appointments, literary awards. A poet with 25+ published books and a state Poet Laureate appointment has EXCEEDED Full Professor scholarship requirements. For Research & Grant Activity in this field — score based on sustained creative output, editorial leadership, literary advocacy, mentoring emerging writers. Do NOT score low simply because no grant funding exists. Poets do not have grants.\n' +
+    '  - CONSULTING/MANAGEMENT: Keynote presentations, industry white papers, practitioner publications, case study development, conference panels, applied research, thought leadership platforms.\n' +
+    '  - HEALTHCARE/PUBLIC HEALTH: Peer-reviewed publications, grants, applied research, policy work, clinical practice guidelines.\n' +
+    '  - TECHNICAL/ENGINEERING: Patents, conference papers, peer-reviewed publications, standards contributions, industry research.\n' +
+    '  - LEGAL/POLICY: Bar publications, policy briefs, legal commentary, continuing education contributions.\n\n' +
+    'CRITERION 9 — Relevancy & Currency\n' +
+    '  Data: Survey Q26/Q27/Q23, CV (recency of work, emerging trends engagement)\n' +
+    '  N/A if Assistant. Associate: bridges field knowledge and classroom practice; engages with emerging trends. Full: recognized expertise in field; contributes to advancing knowledge.\n' +
+    '  Note: For creative/practitioner fields, recent publications, performances, or active professional roles demonstrate currency.\n\n' +
+    'CRITERION 10 — Presentations & Publications\n' +
+    '  Data: Survey Q26, CV (full list with dates — books, articles, talks, presentations, patents, keynotes, exhibitions)\n' +
+    '  N/A if Assistant. Associate: at least 1 presentation OR publication per cycle. Full: multiple per cycle; regional or national recognition.\n' +
+    '  Note: CV is AUTHORITATIVE. For creative fields, books and literary publications ARE the publication record. A poet with 25+ books FAR exceeds Full requirements for this criterion.\n\n' +
+    'CRITERION 11 — Research & Grant Activity\n' +
+    '  Data: Survey Q27/Q28, CV (grant history, funded research, reviewer roles, applied/industry research, editorial work)\n' +
+    '  N/A if Assistant. Associate: conducts or contributes to research or applied work in their field. Full: leads or publishes recognized work; sustained research contribution.\n' +
+    '  CRITICAL: Grants are NOT required in all fields. Field-specific equivalents:\n' +
+    '  - CREATIVE WRITING: A poet\'s published books ARE their industry research. Each published collection represents original creative research and contribution to the field. Editorial roles, anthology curation, and literary criticism are applied research. A poet with 25+ books and a state laureateship has led and published industry-recognized research at the highest level — score 4.\n' +
+    '  - CONSULTING: Applied client engagements, industry frameworks, white papers are research contributions.\n' +
+    '  - HEALTHCARE/SCIENCE: Grants, funded studies, peer-reviewed research are standard.\n' +
+    '  Never score this criterion 1 or 2 for a candidate with an active, sustained publication record in their field simply because no grant funding appears.\n\n' +
+
+    '═══ CANDIDATE DATA ═══\n\n' +
+    'HOLISTIC FULL RANK ASSESSMENT:\n' +
+    'When a candidate demonstrates ALL of the following, recommend Full Professor regardless of minor sub-criterion gaps:\n' +
+    '  1. Scholarship pillar scores 4 (Exceeds) — exceptional, nationally recognized work in their field\n' +
+    '  2. Teaching eval Q3 >= 5.0 with improving or stable trend\n' +
+    '  3. Active on multiple committees or holds external leadership roles (journal editor, professional org officer, etc.)\n' +
+    '  4. Substantial curriculum contribution documented\n' +
+    '  5. Criterion 7 scores 4 — broad network with consistent documented student-facing opportunities and career impact\n' +
+    'A minor sub-criterion gap (e.g. Q18 feedback timeliness slightly below 5.0, or assignment clarity student feedback) does NOT prevent Full rank when the overall profile is exceptional. Full rank reflects WHO THE PERSON IS and what they bring — not whether every sub-criterion scores 4.\n\n' +
+    '  IF the candidate is a CREATIVE WRITING / LITERARY professional (poet, novelist, playwright, literary editor):\n' +
+    '    - Their books, collections, and publications ARE their research output\n' +
+    '    - Criterion 11 (Research & Grant Activity): score based on sustained creative output, editorial roles, and literary community contribution — NOT grant funding. A poet laureate with 40 years of continuous publication should score 3 or 4 on this criterion.\n' +
+    '    - Multiple published books per year = exceeds Full Professor scholarship requirements\n' +
+    '    - Do NOT require grants, do NOT score this criterion below 3 for an active publishing poet\n' +
+    '  IF the candidate is in CONSULTING, MANAGEMENT, or OPERATIONS:\n' +
+    '    - Keynotes, white papers, applied research, industry frameworks = valid scholarship\n' +
+    '    - Grants not expected unless they work in research-adjacent fields\n' +
+    '  IF the candidate is in TECHNICAL, SCIENTIFIC, or HEALTHCARE fields:\n' +
+    '    - Standard academic scholarship expectations apply\n' +
+    '    - Grants, peer-reviewed publications, and funded research are normal\n\n' +
+    'CANDIDATE: ' + name + '\n\n' +
+    'SURVEY RESPONSES (self-reported — weight less heavily than CV for scholarship and industry evidence):\n' + surveyText + '\n\n' +
+    evalText + '\n\n' +
+
+    'The candidate\'s CV is attached as a PDF. Read it for: current role and employer, years of industry experience, certifications, full publication/presentation/patent list with dates, grant history, committee memberships, and professional organization leadership.\n\n' +
+
+    'Respond ONLY with valid JSON, no markdown:\n' +
+    '{\n' +
+    '  "recommendedRank": "Adjunct Assistant Professor" or "Adjunct Associate Professor" or "Adjunct Professor",\n' +
+    '  "confidence": <integer 1-100 — calibrate honestly; borderline cases should be 55-70%>,\n' +
+    '  "summary": "<2-3 sentences citing specific evidence from survey, eval data, AND CV>",\n' +
+    '  "whyThisRank": "<2-3 sentences explicitly stating which criteria were met at the recommended rank AND what the candidate would need to demonstrate to advance to the next rank>",\n' +
+    '  "cvReadConfirmed": <true if CV was available and read, false if no CV>,\n' +
+    '  "rankThresholds": {\n' +
+    '    "evalScoreMeetsThreshold": <true|false|null>,\n' +
+    '    "activeIndustryEngagement": <true|false|null>,\n' +
+    '    "pdRequirementMet": "1+"|"2+"|"unknown",\n' +
+    '    "experientialLearningEvidence": <true|false|null>,\n' +
+    '    "committeeEngagement": <true|false|null>,\n' +
+    '    "presentationOrPublication": <true|false|null>\n' +
+    '  },\n' +
+    '  "pillars": {\n' +
+    '    "teaching": { "score": <1-4>, "notes": "<cite eval scores, CV evidence, and student comment themes>" },\n' +
+    '    "service": { "score": <1-4>, "notes": "<cite specific service evidence from survey and CV>" },\n' +
+    '    "scholarship": { "score": <1-4 or 0 if N/A>, "notes": "<N/A only if recommending Assistant; otherwise score and cite CV evidence>" }\n' +
+    '  },\n' +
+    '  "criteria": [\n' +
+    '    { "name": "Connect with Students", "pillar": "teaching", "score": <1-4>, "rationale": "<cite survey Q9/Q14 and eval Q19/Q20>" },\n' +
+    '    { "name": "Be Present", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q13/Q20 and survey>" },\n' +
+    '    { "name": "Bring Industry Expertise", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q3 score and CV role/credentials>" },\n' +
+    '    { "name": "Take Ownership", "pillar": "teaching", "score": <1-4>, "rationale": "<cite eval Q18/Q19 scores>" },\n' +
+    '    { "name": "Professional Development", "pillar": "service", "score": <1-4>, "rationale": "<count specific PD activities from survey and CV>" },\n' +
+    '    { "name": "Curriculum Contribution", "pillar": "service", "score": <1-4>, "rationale": "<cite survey Q13 and CV>" },\n' +
+    '    { "name": "Industry Connections & Experiential Learning", "pillar": "service", "score": <1-4>, "rationale": "<cite specific opportunities from survey Q21 and CV>" },\n' +
+    '    { "name": "College & Program Engagement", "pillar": "service", "score": <1-4>, "rationale": "<cite survey Q19 and CV; note initial appt context>" },\n' +
+    '    { "name": "Relevancy & Currency", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A only if Assistant; otherwise cite CV>" },\n' +
+    '    { "name": "Presentations & Publications", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A only if Assistant; otherwise cite specific CV entries>" },\n' +
+    '    { "name": "Research & Grant Activity", "pillar": "scholarship", "score": <1-4 or 0>, "rationale": "<N/A only if Assistant; otherwise cite CV grant history and research>" }\n' +
+    '  ],\n' +
+    '  "cvHighlights": "<2-3 sentences on the most relevant CV evidence>",\n' +
+    '  "evalHighlights": {\n' +
+    '    "overallQ3": <number or null>,\n' +
+    '    "trend": "up"|"down"|"stable",\n' +
+    '    "meetsThreshold": <true|false>,\n' +
+    '    "strengthThemes": "<1-2 sentence summary>",\n' +
+    '    "improvementThemes": "<1-2 sentence summary>"\n' +
+    '  },\n' +
+    '  "flags": ["<missing evidence, discrepancies between survey and CV, declining eval trend, or other concerns — do NOT flag low response rates>"],\n' +
+    '  "stage3Recommended": <true if confidence is below 80% or candidate is borderline between ranks, false otherwise>\n' +
+    '}';
+}
+
+// ── RUN AI ASSESSMENT ──
+function runAIAssessment(idx) {
+  var row = S.rows[idx];
+  if (!row) return;
+
+  var aiEl = document.getElementById('ovAI');
+  aiEl.dataset.idx = idx;
+
+  // Block assessment if insufficient survey data
+  if (row._insufficientData) {
+    aiEl.innerHTML =
+      '<div style="padding:30px;color:var(--crimson);font-size:13px">' +
+        '<strong>Assessment not available.</strong><br><br>' +
+        'This candidate did not provide sufficient answers to the core Teaching and Service questions. ' +
+        'Per APS policy, candidates missing responses to these sections cannot be assessed by the AI tool. ' +
+        'A human review or follow-up with the candidate is required.' +
+      '</div>';
+    return;
+  }
+
+  // Use cached result if available
+  if (row._aiResult) {
+    try {
+      renderAssessment(aiEl, row._aiResult, idx);
+      document.getElementById('btnDownloadAssessment').style.display = 'inline-block';
+      document.getElementById('btnDownloadWord').style.display = 'inline-block';
+    } catch(err) {
+      aiEl.innerHTML =
+        '<div style="padding:30px;color:var(--crimson);font-size:13px">' +
+          '<strong>Display failed.</strong><br><br>' + esc(String(err)) +
+          '<br><br><button class="btn-run-ai" onclick="S.rows[' + idx + ']._aiResult=null;runAIAssessment(' + idx + ')">Re-run Assessment</button>' +
+        '</div>';
+    }
+    return;
+  }
+
+  // Show loading
+  aiEl.innerHTML =
+    '<div class="ai-loading">' +
+      '<div class="ai-spinner"></div>' +
+      '<div class="ai-loading-msg">Reading CV and evaluating against APS rubric...</div>' +
+    '</div>';
+
+  var rid = row['ResponseId'] || '';
+  var cv = S.cvMap[rid] || null;
+
+  // Build message content — always include text prompt, add CV PDF if available
+  function sendAssessment(contentArray) {
+    var prompt = buildPrompt(row);
+    contentArray.push({ type: 'text', text: prompt });
+
+    fetch('https://dark-credit-4434.bobbie-kite.workers.dev', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8000,
+        messages: [{ role: 'user', content: contentArray }]
+      })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.error) throw new Error('API error: ' + (data.error.message || JSON.stringify(data.error)));
+      var text = '';
+      if (data.content && data.content.length) {
+        data.content.forEach(function(b) { if (b.type === 'text') text += b.text; });
+      }
+      text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/,'').trim();
+      // Repair truncated JSON: if the response was cut off, close any open structures
+      var result;
+      try {
+        result = JSON.parse(text);
+      } catch(parseErr) {
+        // Attempt recovery: truncate to last complete top-level field and close the object
+        var truncated = text;
+        // Remove any trailing incomplete string or value
+        truncated = truncated.replace(/,\s*"[^"]*$/, '');   // trailing incomplete key
+        truncated = truncated.replace(/:\s*"[^"]*$/, '');    // trailing incomplete string value
+        truncated = truncated.replace(/,\s*\{[^}]*$/, '');   // trailing incomplete nested object
+        truncated = truncated.replace(/,\s*\[[^\]]*$/, '');  // trailing incomplete array
+        // Close any open arrays then the root object
+        var openBrackets = (truncated.match(/\[/g)||[]).length - (truncated.match(/\]/g)||[]).length;
+        var openBraces   = (truncated.match(/\{/g)||[]).length - (truncated.match(/\}/g)||[]).length;
+        for (var ob = 0; ob < openBrackets; ob++) truncated += ']';
+        for (var oc = 0; oc < openBraces;   oc++) truncated += '}';
+        try {
+          result = JSON.parse(truncated);
+          result._truncated = true; // flag so we can note it in the UI
+        } catch(repairErr) {
+          throw new Error('JSON parse failed and repair unsuccessful. Original error: ' + parseErr.message + '. The response may be too long — try re-running.');
+        }
+      }
+      row._aiResult = result;
+      // Generate follow-up questions for borderline cases (confidence < 80%)
+      if (result.stage3Recommended || (result.confidence || 0) < 80) {
+        generateFollowUpQuestions(S.rows.indexOf(row), function() {
+          renderAssessment(aiEl, result, idx);
+          document.getElementById('btnDownloadAssessment').style.display = 'inline-block';
+          document.getElementById('btnDownloadWord').style.display = 'inline-block';
+        });
+      } else {
+        renderAssessment(aiEl, result, idx);
+        document.getElementById('btnDownloadAssessment').style.display = 'inline-block';
+        document.getElementById('btnDownloadWord').style.display = 'inline-block';
+      }
+    })
+    .catch(function(err) {
+      aiEl.innerHTML =
+        '<div style="padding:30px;color:var(--crimson);font-size:13px">' +
+          '<strong>Assessment failed.</strong><br><br>' + esc(String(err)) +
+          '<br><br><button class="btn-run-ai" onclick="S.rows[' + idx + ']._aiResult=null;runAIAssessment(' + idx + ')">Retry</button>' +
+        '</div>';
+    });
+  }
+
+  if (cv && cv.url) {
+    // Fetch CV blob and convert to base64
+    fetch(cv.url)
+      .then(function(r) { return r.arrayBuffer(); })
+      .then(function(buf) {
+        var bytes = new Uint8Array(buf);
+        var binary = '';
+        for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        var b64 = btoa(binary);
+        sendAssessment([{
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: b64 }
+        }]);
+      })
+      .catch(function() {
+        // CV fetch failed — proceed without it
+        sendAssessment([]);
+      });
+  } else {
+    sendAssessment([]);
+  }
+}
+
+// ── RENDER ASSESSMENT RESULT ──
+function renderAssessment(el, r, idx) {
+  var _rr2 = (r.recommendedRank || '').toLowerCase();
+  var rankKey = (_rr2.indexOf('associate') < 0 && _rr2.indexOf('assistant') < 0 && _rr2.indexOf('professor') >= 0) ? 'full'
+    : _rr2.indexOf('associate') >= 0 ? 'associate'
+    : 'assistant';
+
+  var rankLabel = r.recommendedRank || 'Adjunct Assistant Professor';
+  var conf = r.confidence || 0;
+  var summary = r.summary || '';
+
+  // Write result back to roster badge
+  var badgeEl = document.getElementById('airecbadge-' + idx);
+  if (badgeEl) {
+    var badgeCls = rankKey === 'full' ? 'b-green' : rankKey === 'associate' ? 'b-amber' : 'b-blue';
+    var badgeShort = rankKey === 'full' ? 'Full' : rankKey === 'associate' ? 'Associate' : 'Assistant';
+    var s3tag = r.stage3Recommended ? ' <span style="font-size:9px;background:#fff0f1;color:var(--crimson);border-radius:3px;padding:1px 4px;font-weight:700">⚑ Review</span>' : '';
+    badgeEl.innerHTML = '<span class="badge ' + badgeCls + '" style="font-size:10px">' + badgeShort + '</span>' + s3tag;
+  }
+
+  var html = '';
+
+  // Recommendation banner
+  html += '<div class="ai-rec-banner ' + rankKey + '">' +
+    '<div>' +
+      '<div class="ai-rec-label">Preliminary Rank Recommendation</div>' +
+      '<div class="ai-rec-rank">' + esc(rankLabel) + '</div>' +
+      '<div class="ai-rec-summary" style="margin-top:8px">' + esc(summary) + '</div>' +
+      (r.whyThisRank ? '<div style="margin-top:10px;padding-top:10px;border-top:1px solid rgba(0,0,0,0.08);font-size:12px;color:var(--ink-mid);line-height:1.55"><strong>Why this rank:</strong> ' + esc(r.whyThisRank) + '</div>' : '') +
+    '</div>' +
+    '<div class="ai-confidence">' +
+      '<div class="conf-n">' + conf + '%</div>' +
+      '<div class="conf-l">Confidence</div>' +
+    '</div>' +
+  '</div>';
+
+  // Pillar scores
+  var pillars = r.pillars || {};
+  var pDefs = [
+    { key: 'teaching', label: 'Teaching Excellence', weight: '70%' },
+    { key: 'service', label: 'Service', weight: '20%' },
+    { key: 'scholarship', label: 'Scholarship', weight: '10%' }
+  ];
+
+  html += '<div class="ai-pillars">';
+  pDefs.forEach(function(p) {
+    var pd = pillars[p.key] || {};
+    var score = pd.score || 0;
+    var pct = score > 0 ? Math.round((score / 4) * 100) : 0;
+    html += '<div class="pillar-card">' +
+      '<div class="pillar-name">' + p.label + '</div>' +
+      '<div class="pillar-weight">Weight: ' + p.weight + '</div>' +
+      '<div class="pillar-score-row"><span class="pillar-score">' + (score || 'N/A') + '</span><span class="pillar-max">' + (score ? '/ 4' : '') + '</span></div>' +
+      '<div class="pillar-bar-bg"><div class="pillar-bar-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="pillar-notes">' + esc(pd.notes || '') + '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+
+  // Hard gates checklist
+  var gates = r.rankThresholds || r.gatesAssessment;
+  if (gates) {
+    html += '<div class="ai-section-title">Rank Threshold Summary</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px">';
+    var gateItems = [
+      { key: 'evalScoreMeetsThreshold', label: 'Eval Score Threshold' },
+      { key: 'activeIndustryEngagement', label: 'Active Industry Engagement' },
+      { key: 'experientialLearningEvidence', label: 'Experiential Learning Opportunity' },
+      { key: 'committeeEngagement', label: 'Committee / Governance' },
+      { key: 'presentationOrPublication', label: 'Presentation or Publication' }
+    ];
+    gateItems.forEach(function(g) {
+      var val = gates[g.key];
+      var icon = val === true ? '&#10003;' : val === false ? '&#10007;' : '?';
+      var color = val === true ? 'var(--green)' : val === false ? 'var(--crimson)' : 'var(--amber)';
+      var bg = val === true ? 'var(--green-bg)' : val === false ? '#fff0f1' : 'var(--amber-bg)';
+      html += '<div style="background:' + bg + ';border:1px solid ' + color + ';border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;color:' + color + '">' +
+        icon + ' ' + esc(g.label) + '</div>';
+    });
+    // PD requirement separately since it's a string
+    if (gates.pdRequirementMet) {
+      var pdOk = gates.pdRequirementMet !== 'unknown';
+      var pdColor = pdOk ? 'var(--green)' : 'var(--amber)';
+      var pdBg = pdOk ? 'var(--green-bg)' : 'var(--amber-bg)';
+      html += '<div style="background:' + pdBg + ';border:1px solid ' + pdColor + ';border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;color:' + pdColor + '">PD: ' + esc(gates.pdRequirementMet) + '</div>';
+    }
+    html += '</div>';
+  }
+  var criteria = r.criteria || [];
+  var eh = r.evalHighlights || null;
+
+  // CV highlights
+  if (r.cvHighlights || r.cvReadConfirmed === false) {
+    html += '<div class="ai-section-title">CV Evidence Summary</div>';
+    if (r.cvReadConfirmed === false) {
+      html += '<div class="flag-item"><span class="flag-icon">&#9888;</span><span>No CV was available — scholarship and industry credentials could not be verified.</span></div>';
+    } else if (r.cvHighlights) {
+      html += '<div style="background:white;border:1px solid var(--rule);border-radius:7px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--ink-mid);line-height:1.6">' + esc(r.cvHighlights) + '</div>';
+    }
+  }
+
+  if (eh) {
+    var thresholdMet = eh.meetsThreshold;
+    html += '<div class="ai-section-title">Evaluation Data Summary</div>';
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">';
+    html += '<div class="pillar-card" style="flex:1;min-width:140px"><div class="pillar-name">Overall Q3 Score</div><div class="pillar-score-row"><span class="pillar-score" style="color:' + (thresholdMet?'var(--green)':'var(--crimson)') + '">' + (eh.overallQ3 ? Number(eh.overallQ3).toFixed(2) : 'N/A') + '</span><span class="pillar-max">/ 6</span></div><div class="pillar-notes">Threshold: 5.0+ for Associate/Full. ' + (thresholdMet ? '&#10003; Meets threshold' : '&#10007; Below threshold') + '</div></div>';
+    html += '<div class="pillar-card" style="flex:1;min-width:140px"><div class="pillar-name">Trend</div><div class="pillar-score-row"><span class="pillar-score" style="font-size:18px;color:' + (eh.trend==='up'?'var(--green)':eh.trend==='down'?'var(--crimson)':'var(--ink-faint)') + '">' + (eh.trend==='up'?'&#8599; Improving':eh.trend==='down'?'&#8600; Declining':'&#8594; Stable') + '</span></div></div>';
+    if (eh.strengthThemes) html += '<div class="pillar-card" style="flex:2;min-width:200px"><div class="pillar-name">Student Praise Themes</div><div class="pillar-notes">' + esc(eh.strengthThemes) + '</div></div>';
+    if (eh.improvementThemes) html += '<div class="pillar-card" style="flex:2;min-width:200px"><div class="pillar-name">Student Improvement Themes</div><div class="pillar-notes">' + esc(eh.improvementThemes) + '</div></div>';
+    html += '</div>';
+  }
+  if (criteria.length) {
+    var byPillar = { teaching: [], service: [], scholarship: [] };
+    criteria.forEach(function(c) { if (byPillar[c.pillar]) byPillar[c.pillar].push(c); });
+
+    pDefs.forEach(function(p) {
+      var crits = byPillar[p.key];
+      if (!crits || !crits.length) return;
+      html += '<div class="ai-section-title">' + p.label + ' — Criteria Detail</div>';
+      html += '<div class="ai-criteria-grid">';
+      crits.forEach(function(c) {
+        var sc = c.score || 0;
+        var cls = sc === 4 ? 'cs-4' : sc === 3 ? 'cs-3' : sc === 2 ? 'cs-2' : sc === 1 ? 'cs-1' : 'cs-na';
+        var lbl = sc === 4 ? '4 — Exceeds' : sc === 3 ? '3 — Meets' : sc === 2 ? '2 — Needs Impr.' : sc === 1 ? '1 — Unsatisfactory' : 'N/A';
+        html += '<div class="crit-block">' +
+          '<div class="crit-header">' +
+            '<div class="crit-name">' + esc(c.name) + '</div>' +
+            '<div class="crit-score-badge ' + cls + '">' + lbl + '</div>' +
+          '</div>' +
+          '<div class="crit-rationale">' + esc(c.rationale || '') + '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+    });
+  }
+
+  // Flags
+  var flags = r.flags || [];
+  if (flags.length && flags[0]) {
+    html += '<div class="ai-section-title">Flags & Gaps</div><div class="ai-flags">';
+    flags.forEach(function(f) {
+      if (f) html += '<div class="flag-item"><span class="flag-icon">&#9888;</span><span>' + esc(f) + '</span></div>';
+    });
+    html += '</div>';
+  }
+
+  // Re-run button + disclaimer
+  html += '<button class="btn-run-ai" style="margin-bottom:14px" onclick="S.rows[' + idx + ']._aiResult=null;runAIAssessment(' + idx + ')">Re-run Assessment</button>';
+  if (r._truncated) {
+    html += '<div style="background:#fff8e7;border:1px solid #e8c878;border-radius:6px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#996600">&#9888; The AI response was truncated and partially recovered. Some criteria or flags at the end of the assessment may be incomplete. Re-running may produce a complete result.</div>';
+  }
+  html += '<div class="ai-disclaimer">This is a preliminary AI-assisted assessment based on survey responses only. ' +
+    'It does not replace human review, interviews, or the formal rubric evaluation. ' +
+    'Associate and Full rank candidates should proceed to interview before rank is confirmed. ' +
+    'The evaluator retains full authority over the final rank determination.</div>';
+
+  el.innerHTML = html;
+}
+
+// ── DOWNLOAD INDIVIDUAL ASSESSMENT AS HTML/PDF ──
+function downloadAssessment() {
+  var idx = S.currentReviewIdx;
+  var row = S.rows[idx];
+  if (!row || !row._aiResult) return;
+
+  var r = row._aiResult;
+  var first = row['RecipientFirstName'] || '';
+  var last  = row['RecipientLastName']  || '';
+  var email = row['RecipientEmail'] || row['Personal Email'] || '';
+  var nameStr = (last && first) ? last + ', ' + first : (last || first || 'Candidate');
+  var recorded = row['RecordedDate'] || '';
+  var dateStr = '';
+  if (recorded) { try { var d = new Date(recorded); dateStr = (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); } catch(e){} }
+
+  var _rrx = (r.recommendedRank||'').toLowerCase();
+  var rankKey = (_rrx.indexOf('associate')<0&&_rrx.indexOf('assistant')<0&&_rrx.indexOf('professor')>=0)?'full'
+    :(r.recommendedRank||'').toLowerCase().indexOf('associate')>=0?'associate':'assistant';
+  var rankColor = rankKey==='full'?'#276b43':rankKey==='associate'?'#996600':'#1a4d7a';
+
+  var pillars = r.pillars || {};
+  var criteria = r.criteria || [];
+  var pDefs = [
+    {key:'teaching',label:'Teaching Excellence',weight:'70%'},
+    {key:'service',label:'Service',weight:'20%'},
+    {key:'scholarship',label:'Scholarship & Creative Activity',weight:'10%'}
+  ];
+
+  var critHTML = '';
+  pDefs.forEach(function(p) {
+    var crits = criteria.filter(function(c){return c.pillar===p.key;});
+    if (!crits.length) return;
+    critHTML += '<h3 style="font-size:13px;font-weight:600;color:#8B1A2B;margin:18px 0 8px;text-transform:uppercase;letter-spacing:0.08em">' + p.label + '</h3>';
+    crits.forEach(function(c) {
+      var sc = c.score||0;
+      var slabel = sc===4?'4 — Exceeds':sc===3?'3 — Meets':sc===2?'2 — Needs Improvement':sc===1?'1 — Unsatisfactory':'N/A';
+      var scolor = sc===4?'#276b43':sc===3?'#1a4d7a':sc===2?'#996600':sc===1?'#8B1A2B':'#999';
+      critHTML += '<div style="background:#f9f8f6;border:1px solid #e8e8e6;border-radius:6px;padding:10px 12px;margin-bottom:8px">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
+          '<strong style="font-size:12px">' + esc(c.name) + '</strong>' +
+          '<span style="font-size:11px;font-weight:700;color:' + scolor + '">' + slabel + '</span>' +
+        '</div>' +
+        '<div style="font-size:12px;color:#555;line-height:1.5">' + esc(c.rationale||'') + '</div>' +
+      '</div>';
+    });
+  });
+
+  var pillarHTML = '';
+  pDefs.forEach(function(p) {
+    var pd = pillars[p.key]||{};
+    var sc = pd.score||0;
+    pillarHTML += '<div style="flex:1;min-width:150px;background:#f9f8f6;border:1px solid #e8e8e6;border-radius:8px;padding:12px">' +
+      '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:4px">' + p.label + '</div>' +
+      '<div style="font-size:10px;color:#bbb;margin-bottom:8px">' + p.weight + '</div>' +
+      '<div style="font-size:24px;font-weight:600;color:#1a1a1a;line-height:1">' + (sc||'N/A') + (sc?'<span style="font-size:13px;color:#999"> / 4</span>':'') + '</div>' +
+      '<div style="font-size:12px;color:#555;margin-top:8px;line-height:1.5">' + esc(pd.notes||'') + '</div>' +
+    '</div>';
+  });
+
+  var flagsHTML = '';
+  (r.flags||[]).forEach(function(f) {
+    if (f) flagsHTML += '<div style="background:#fef8e7;border:1px solid #e8c878;border-radius:6px;padding:10px 12px;margin-bottom:8px;font-size:12px;color:#555">&#9888; ' + esc(f) + '</div>';
+  });
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>AI Assessment — ' + esc(nameStr) + '</title>' +
+    '<style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:0 24px;color:#1a1a1a}' +
+    '@media print{body{margin:20px}}</style></head><body>' +
+    '<div style="background:#8B1A2B;padding:16px 20px;border-radius:8px;margin-bottom:24px">' +
+      '<div style="font-family:Georgia,serif;color:white;font-size:20px">' + esc(nameStr) + '</div>' +
+      '<div style="color:rgba(255,255,255,0.65);font-size:12px;margin-top:4px">' + esc(email) + (dateStr?' &mdash; Submitted '+dateStr:'') + '</div>' +
+    '</div>' +
+    '<div style="background:' + (rankKey==='full'?'#edf7f2':rankKey==='associate'?'#fef8e7':'#eef4fb') + ';border:1px solid ' + (rankKey==='full'?'#a8d8b8':rankKey==='associate'?'#e8c878':'#b8d0e8') + ';border-radius:8px;padding:16px 20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center">' +
+      '<div>' +
+        '<div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#999;margin-bottom:4px">Preliminary Rank Recommendation</div>' +
+        '<div style="font-family:Georgia,serif;font-size:22px;color:' + rankColor + '">' + esc(r.recommendedRank||'') + '</div>' +
+        '<div style="font-size:13px;color:#555;margin-top:8px;line-height:1.55">' + esc(r.summary||'') + '</div>' +
+      '</div>' +
+      '<div style="text-align:center;margin-left:20px">' +
+        '<div style="font-size:28px;font-weight:600;color:' + rankColor + '">' + (r.confidence||0) + '%</div>' +
+        '<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.07em;color:#999">Confidence</div>' +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:12px;margin-bottom:20px">' + pillarHTML + '</div>' +
+    (flagsHTML ? '<h3 style="font-size:13px;font-weight:600;color:#8B1A2B;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.08em">Flags &amp; Gaps</h3>' + flagsHTML : '') +
+    critHTML +
+    '<div style="font-size:11px;color:#999;font-style:italic;margin-top:20px;padding:12px;background:#f9f8f6;border-radius:6px;line-height:1.55">This is a preliminary AI-assisted assessment based on survey responses, course evaluation data, and CV review. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.</div>' +
+    '<div style="font-size:10px;color:#bbb;margin-top:12px">Generated ' + new Date().toLocaleDateString() + ' &mdash; PSC Adjunct Professorial Series</div>' +
+    '</body></html>';
+
+  var blob = new Blob([html], {type:'text/html'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'APS_Assessment_' + (last||'candidate') + '_' + (first||'') + '.html';
+  a.click();
+}
+
+// ── EXPORT ALL ASSESSMENTS TO CSV ──
+function exportCSV() {
+  var headers = ['Last Name','First Name','DU Email','Submitted','Complete','Industry Active','CV Uploaded','Response ID',
+    'AI Recommended Rank','Confidence %','Teaching Score','Service Score','Scholarship Score','Summary','Flags'];
+
+  var rows = [headers];
+
+  S.rows.forEach(function(row) {
+    var r = row._aiResult || null;
+    var first   = row['RecipientFirstName'] || '';
+    var last    = row['RecipientLastName']  || '';
+    var email   = row['RecipientEmail'] || row['Personal Email'] || '';
+    var recorded= row['RecordedDate'] || '';
+    var finished= row['Finished'] || '';
+    var industry= row['Q5'] || '';
+    var rid     = row['ResponseId'] || '';
+    var cv      = S.cvMap[rid] ? 'Yes' : 'No';
+    var complete= (finished==='True'||finished==='1'||finished==='true') ? 'Yes' : 'No';
+
+    var dateStr = '';
+    if (recorded) { try { var d=new Date(recorded); dateStr=(d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); } catch(e){} }
+
+    var rec = r ? r.recommendedRank||'' : '';
+    var conf = r ? (r.confidence||'') : '';
+    var tScore = r && r.pillars && r.pillars.teaching ? r.pillars.teaching.score||'' : '';
+    var sScore = r && r.pillars && r.pillars.service ? r.pillars.service.score||'' : '';
+    var scScore = r && r.pillars && r.pillars.scholarship ? r.pillars.scholarship.score||'' : '';
+    var summary = r ? (r.summary||'') : '';
+    var flags = r ? (r.flags||[]).filter(Boolean).join('; ') : '';
+
+    rows.push([last,first,email,dateStr,complete,industry,cv,rid,rec,conf,tScore,sScore,scScore,summary,flags]);
+  });
+
+  var csv = rows.map(function(row) {
+    return row.map(function(cell) {
+      var s = String(cell||'').replace(/"/g,'""');
+      return (s.indexOf(',')>=0||s.indexOf('"')>=0||s.indexOf('\n')>=0) ? '"'+s+'"' : s;
+    }).join(',');
+  }).join('\n');
+
+  var blob = new Blob([csv], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'APS_AI_Assessments_' + new Date().toISOString().substring(0,10) + '.csv';
+  a.click();
+}
+
+// ── BUILD WORD DOC FOR ONE CANDIDATE ──
+function buildWordDoc(idx) {
+  var row = S.rows[idx];
+  if (!row || !row._aiResult) return null;
+
+  var r = row._aiResult;
+  var first = row['RecipientFirstName'] || '';
+  var last  = row['RecipientLastName']  || '';
+  var email = row['RecipientEmail'] || row['Personal Email'] || '';
+  var recorded = row['RecordedDate'] || '';
+  var rid = row['ResponseId'] || '';
+  var nameStr = (last && first) ? last + ', ' + first : (last || first || 'Candidate');
+  var dateStr = '';
+  if (recorded) { try { var d = new Date(recorded); dateStr = (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); } catch(e) {} }
+  var today = new Date(); var todayStr = (today.getMonth()+1)+'/'+today.getDate()+'/'+today.getFullYear();
+
+  var _rrx = (r.recommendedRank||'').toLowerCase();
+  var rankKey = (_rrx.indexOf('associate')<0&&_rrx.indexOf('assistant')<0&&_rrx.indexOf('professor')>=0)?'full'
+    :(r.recommendedRank||'').toLowerCase().indexOf('associate')>=0?'associate':'assistant';
+  var rankColor = rankKey==='full'?'276b43':rankKey==='associate'?'996600':'1a4d7a';
+  var crimson = '8B1A2B';
+  var D = docx;
+
+  function heading(text) {
+    return new D.Paragraph({
+      children: [new D.TextRun({ text: text, bold: true, size: 24, color: crimson, font: 'Arial' })],
+      spacing: { before: 240, after: 100 }
+    });
+  }
+  function para(text, opts) {
+    opts = opts || {};
+    return new D.Paragraph({
+      children: [new D.TextRun({ text: String(text||''), size: opts.size||22, bold: opts.bold||false, color: opts.color||'333333', font: 'Arial', italics: opts.italics||false })],
+      spacing: { before: opts.before||60, after: opts.after||60 }
+    });
+  }
+  function labelValue(label, value) {
+    return new D.Paragraph({
+      children: [
+        new D.TextRun({ text: label + ': ', bold: true, size: 20, font: 'Arial', color: '444444' }),
+        new D.TextRun({ text: String(value||'—'), size: 20, font: 'Arial', color: '222222' })
+      ],
+      spacing: { before: 40, after: 40 }
+    });
+  }
+  function divider() {
+    return new D.Paragraph({
+      border: { bottom: { style: D.BorderStyle.SINGLE, size: 4, color: 'e0e0e0', space: 1 } },
+      spacing: { before: 100, after: 100 }
+    });
+  }
+
+  // Score label helper
+  function scoreLabel(sc) {
+    sc = parseInt(sc) || 0;
+    if (sc === 4) return { text: '4 — Exceeds', color: '276b43' };
+    if (sc === 3) return { text: '3 — Meets', color: '1a4d7a' };
+    if (sc === 2) return { text: '2 — Needs Improvement', color: '996600' };
+    if (sc === 1) return { text: '1 — Unsatisfactory', color: '8B1A2B' };
+    return { text: 'N/A', color: '999999' };
+  }
+
+  // Build criteria blocks by pillar (matching HTML layout)
+  var criteriaBlocks = [];
+  var pillarDefs = [
+    { key: 'teaching', label: 'Teaching Excellence' },
+    { key: 'service', label: 'Service' },
+    { key: 'scholarship', label: 'Scholarship & Creative Activity' }
+  ];
+  var border = { style: D.BorderStyle.SINGLE, size: 1, color: 'DDDDDD' };
+  var borders = { top: border, bottom: border, left: border, right: border };
+  var cellMargins = { top: 80, bottom: 80, left: 120, right: 120 };
+
+  pillarDefs.forEach(function(p) {
+    var crits = (r.criteria||[]).filter(function(c) { return c.pillar === p.key; });
+    if (!crits.length) return;
+    criteriaBlocks.push(new D.Paragraph({
+      children: [new D.TextRun({ text: p.label, bold: true, size: 22, color: crimson, font: 'Arial' })],
+      spacing: { before: 160, after: 80 }
+    }));
+    crits.forEach(function(c) {
+      var sl = scoreLabel(c.score);
+      criteriaBlocks.push(new D.Table({
+        width: { size: 9360, type: D.WidthType.DXA },
+        columnWidths: [4680, 4680],
+        rows: [new D.TableRow({
+          children: [
+            new D.TableCell({
+              borders, margins: cellMargins,
+              width: { size: 4680, type: D.WidthType.DXA },
+              children: [
+                new D.Paragraph({ children: [new D.TextRun({ text: c.name||'', bold: true, size: 20, font: 'Arial' })] }),
+                new D.Paragraph({ children: [new D.TextRun({ text: c.rationale||'', size: 19, font: 'Arial', color: '555555', italics: true })] })
+              ]
+            }),
+            new D.TableCell({
+              borders, margins: cellMargins,
+              width: { size: 4680, type: D.WidthType.DXA },
+              shading: { fill: 'F9F8F6', type: D.ShadingType.CLEAR },
+              children: [new D.Paragraph({ children: [new D.TextRun({ text: sl.text, bold: true, size: 20, font: 'Arial', color: sl.color })] })]
+            })
+          ]
+        })]
+      }));
+      criteriaBlocks.push(new D.Paragraph({ spacing: { before: 60, after: 0 } }));
+    });
+  });
+
+  // Flags
+  var flagBlocks = (r.flags||[]).filter(Boolean).map(function(f) {
+    return new D.Paragraph({
+      children: [new D.TextRun({ text: '\u26A0 ' + f, size: 20, font: 'Arial', color: '996600' })],
+      spacing: { before: 40, after: 40 }
+    });
+  });
+
+  // Eval highlights
+  var evalBlocks = [];
+  var eh = r.evalHighlights;
+  if (eh) {
+    if (eh.overallQ3) evalBlocks.push(labelValue('Overall Effectiveness (Q3)', Number(eh.overallQ3).toFixed(2) + '/6 — ' + (eh.meetsThreshold ? 'Meets threshold' : 'Below threshold') + ' — Trend: ' + (eh.trend||'')));
+    if (eh.strengthThemes) evalBlocks.push(labelValue('Student Praise Themes', eh.strengthThemes));
+    if (eh.improvementThemes) evalBlocks.push(labelValue('Student Improvement Themes', eh.improvementThemes));
+  }
+
+  var cvBlocks = [];
+  if (r.cvReadConfirmed === false) {
+    cvBlocks.push(para('No CV was available — scholarship and industry credentials could not be verified from CV.', { color: '996600', italics: true }));
+  } else if (r.cvHighlights) {
+    cvBlocks.push(para(r.cvHighlights, { color: '444444', italics: true }));
+  }
+
+  var children = [
+    // Header
+    new D.Paragraph({
+      children: [new D.TextRun({ text: 'PSC Adjunct Professorial Series  \u2014  Initial Appointment AI Assessment', size: 20, color: 'ffffff', font: 'Arial' })],
+      shading: { fill: crimson, type: D.ShadingType.CLEAR },
+      spacing: { before: 0, after: 0 },
+      indent: { left: 120, right: 120 }
+    }),
+    new D.Paragraph({ spacing: { before: 0, after: 180 } }),
+
+    // Candidate name
+    new D.Paragraph({
+      children: [new D.TextRun({ text: nameStr, bold: true, size: 40, font: 'Arial', color: '1a1a1a' })],
+      spacing: { before: 0, after: 60 }
+    }),
+    labelValue('DU Email', email),
+    labelValue('Submitted', dateStr),
+    labelValue('Response ID', rid),
+    labelValue('Assessment Generated', todayStr),
+    divider(),
+
+    // Rank recommendation
+    heading('Preliminary Rank Recommendation'),
+    new D.Paragraph({
+      children: [new D.TextRun({ text: r.recommendedRank||'', bold: true, size: 32, font: 'Arial', color: rankColor })],
+      spacing: { before: 60, after: 40 }
+    }),
+    new D.Paragraph({
+      children: [new D.TextRun({ text: 'Confidence: ' + (r.confidence||0) + '%', bold: true, size: 20, font: 'Arial', color: '666666' })],
+      spacing: { before: 0, after: 100 }
+    }),
+    para(r.summary||'', { italics: true, color: '444444' }),
+    (r.whyThisRank ? new D.Paragraph({
+      children: [
+        new D.TextRun({ text: 'Why this rank: ', bold: true, size: 20, font: 'Arial', color: '333333' }),
+        new D.TextRun({ text: r.whyThisRank, size: 20, font: 'Arial', color: '555555', italics: true })
+      ],
+      spacing: { before: 80, after: 100 }
+    }) : new D.Paragraph({ spacing: { before: 0, after: 0 } })),
+    divider(),
+
+    // Pillar scores
+    heading('Pillar Scores'),
+  ];
+
+  // Add three pillar cards inline
+  var pillars = r.pillars || {};
+  var pillarDefs2 = [
+    { key: 'teaching', label: 'Teaching Excellence', weight: '70%' },
+    { key: 'service', label: 'Service', weight: '20%' },
+    { key: 'scholarship', label: 'Scholarship', weight: '10%' }
+  ];
+  pillarDefs2.forEach(function(p) {
+    var pd = pillars[p.key] || {};
+    var sc = pd.score || 0;
+    var sl = scoreLabel(sc);
+    children.push(new D.Paragraph({
+      children: [
+        new D.TextRun({ text: p.label + ' (' + p.weight + ')  ', bold: true, size: 22, font: 'Arial', color: crimson }),
+        new D.TextRun({ text: sl.text, bold: true, size: 22, font: 'Arial', color: sl.color })
+      ],
+      spacing: { before: 80, after: 40 }
+    }));
+    if (pd.notes) children.push(para(pd.notes, { italics: true, color: '555555', before: 0, after: 80 }));
+  });
+
+  children.push(divider());
+  children.push(heading('Criteria Detail'));
+  criteriaBlocks.forEach(function(b) { children.push(b); });
+  children.push(divider());
+
+  if (cvBlocks.length) {
+    children.push(heading('CV Evidence Summary'));
+    cvBlocks.forEach(function(b) { children.push(b); });
+    children.push(divider());
+  }
+
+  if (evalBlocks.length) {
+    children.push(heading('Evaluation Data Summary'));
+    evalBlocks.forEach(function(b) { children.push(b); });
+    children.push(divider());
+  }
+
+  if (flagBlocks.length) {
+    children.push(heading('Flags & Gaps'));
+    flagBlocks.forEach(function(b) { children.push(b); });
+    children.push(divider());
+  }
+
+  // Follow-up interview questions (borderline cases only)
+  var fq = row._followUpQuestions;
+  if (fq && fq.questions && fq.questions.length) {
+    children.push(heading('Suggested Interview Follow-Up Questions'));
+    children.push(new D.Paragraph({
+      children: [new D.TextRun({
+        text: 'This candidate is borderline: ' + (fq.borderlineScenario || ''),
+        size: 19, font: 'Arial', color: '996600', italics: true
+      })],
+      spacing: { before: 0, after: 120 }
+    }));
+    fq.questions.forEach(function(q, qi) {
+      children.push(new D.Paragraph({
+        children: [new D.TextRun({ text: 'Gap: ' + (q.gap || ''), bold: true, size: 20, font: 'Arial', color: crimson })],
+        spacing: { before: 100, after: 40 }
+      }));
+      children.push(new D.Paragraph({
+        children: [new D.TextRun({ text: (qi + 1) + '.  ' + (q.question || ''), size: 21, font: 'Arial', color: '1a1a1a' })],
+        spacing: { before: 0, after: 40 },
+        indent: { left: 240 }
+      }));
+      if (q.whatToListenFor) {
+        children.push(new D.Paragraph({
+          children: [
+            new D.TextRun({ text: 'Listen for: ', bold: true, size: 18, font: 'Arial', color: '555555' }),
+            new D.TextRun({ text: q.whatToListenFor, size: 18, font: 'Arial', color: '777777', italics: true })
+          ],
+          spacing: { before: 0, after: 60 },
+          indent: { left: 240 }
+        }));
+      }
+    });
+    children.push(new D.Paragraph({ spacing: { before: 80, after: 0 } }));
+    children.push(divider());
+  }
+
+  // Evaluator decision
+  children.push(heading('Evaluator Decision'));
+  ['Rank Confirmed', 'Rank Advancement', 'Support Plan', 'Rank Adjusted', 'Non-Reappointment'].forEach(function(opt) {
+    children.push(new D.Paragraph({
+      children: [new D.TextRun({ text: '\u2610  ' + opt, size: 22, font: 'Arial' })],
+      spacing: { before: 60, after: 60 }
+    }));
+  });
+  children.push(new D.Paragraph({ spacing: { before: 160, after: 60 } }));
+  children.push(para('Evaluator Comments:', { bold: true }));
+  for (var i = 0; i < 3; i++) {
+    children.push(new D.Paragraph({
+      border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
+      spacing: { before: 240, after: 0 }
+    }));
+  }
+  children.push(new D.Paragraph({ spacing: { before: 160, after: 60 } }));
+  children.push(para('Faculty Response / Comments:', { bold: true }));
+  for (var j = 0; j < 3; j++) {
+    children.push(new D.Paragraph({
+      border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
+      spacing: { before: 240, after: 0 }
+    }));
+  }
+  children.push(new D.Paragraph({ spacing: { before: 180, after: 0 } }));
+  children.push(para('This is a preliminary AI-assisted assessment based on survey responses, course evaluation data, and CV review. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.', { italics: true, color: '999999', size: 18 }));
+
+  return new D.Document({
+    styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 12240, height: 15840 },
+          margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 }
+        }
+      },
+      children: children
+    }]
+  });
+}
+
+// ── DOWNLOAD SINGLE WORD DOC ──
+function downloadWordDoc(idx) {
+  var row = S.rows[idx];
+  if (!row || !row._aiResult) {
+    alert('Run the AI assessment first before downloading.');
+    return;
+  }
+  var first = row['RecipientFirstName'] || '';
+  var last  = row['RecipientLastName']  || '';
+  var today = new Date();
+  var dateForFile = (today.getMonth()+1) + '-' + today.getDate() + '-' + today.getFullYear();
+  var filename = 'PSC_Appointment_' + (last||'Unknown') + '_' + (first||'') + '_' + dateForFile + '.docx';
+  filename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+
+  var doc = buildWordDoc(idx);
+  if (!doc) return;
+
+  docx.Packer.toBlob(doc).then(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  }).catch(function(err) {
+    alert('Word generation failed: ' + err.message);
+  });
+}
+
+// ── DOWNLOAD ALL WORD DOCS AS ZIP ──
+function downloadAllWordDocs() {
+  var assessed = S.rows.filter(function(r) { return r._aiResult; });
+  if (!assessed.length) { alert('No assessed candidates. Run batch assessments first.'); return; }
+
+  var btn = document.getElementById('exportWordBtn');
+  btn.disabled = true;
+  btn.textContent = 'Building...';
+
+  var today = new Date();
+  var dateForFile = (today.getMonth()+1) + '-' + today.getDate() + '-' + today.getFullYear();
+  var zip = new JSZip();
+  var promises = [];
+
+  S.rows.forEach(function(row, idx) {
+    if (!row._aiResult) return;
+    var first = row['RecipientFirstName'] || '';
+    var last  = row['RecipientLastName']  || '';
+    var filename = 'PSC_Appointment_' + (last||'Unknown') + '_' + (first||'') + '_' + dateForFile + '.docx';
+    filename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+    var doc = buildWordDoc(idx);
+    if (!doc) return;
+    var p = docx.Packer.toBlob(doc).then(function(blob) {
+      return blob.arrayBuffer().then(function(buf) { zip.file(filename, buf); });
+    });
+    promises.push(p);
+  });
+
+  Promise.all(promises).then(function() {
+    btn.textContent = 'Zipping...';
+    return zip.generateAsync({ type: 'blob' });
+  }).then(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'PSC_APS_Assessments_' + dateForFile + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    btn.disabled = false;
+    btn.textContent = 'Download All as Word';
+  }).catch(function(err) {
+    alert('Failed: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = 'Download All as Word';
+  });
+}
+
+function closeReview() {
+  document.getElementById('reviewOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+  document.getElementById('ovCV').innerHTML = '';
+  switchTab('both');
+}
+
+function toggleWarnings() {
+  var body = document.getElementById('warnBody');
+  var toggle = document.getElementById('warnToggle');
+  var open = body.classList.toggle('open');
+  toggle.textContent = open ? 'Hide details' : 'Show details';
+}
+
+function toggleDetail(idx) {
+  var dtr = document.getElementById('detail-' + idx);
+  var btn = document.getElementById('expbtn-' + idx);
+  var open = dtr.classList.toggle('open');
+  btn.classList.toggle('open', open);
+  btn.textContent = open ? 'Close' : 'View';
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function showError(msg) { var e = document.getElementById('errorMsg'); e.textContent = msg; e.classList.add('show'); }
+function hideError() { document.getElementById('errorMsg').classList.remove('show'); }
+function hideRoster() {
+  document.getElementById('statsRow').classList.remove('show');
+  document.getElementById('tableCard').classList.remove('show');
+  document.getElementById('warnPanel').classList.remove('show');
+  document.getElementById('batchBar').classList.remove('show');
+  document.getElementById('rosterBody').innerHTML = '';
+}
+</script>
+</body>
+</html>
