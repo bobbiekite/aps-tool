@@ -1278,6 +1278,7 @@ function runBatchAssessments() {
             var _ad = new Date();
             S.rows[idx]._assessmentDate = (_ad.getMonth()+1) + '/' + _ad.getDate() + '/' + _ad.getFullYear();
           }
+          var _rr1 = (result.recommendedRank || '').toLowerCase().trim();
           var rankKey = (_rr1.indexOf('associate') < 0 && _rr1.indexOf('assistant') < 0 && _rr1.indexOf('professor') >= 0) ? 'full'
             : _rr1.indexOf('associate') >= 0 ? 'associate'
             : 'assistant';
