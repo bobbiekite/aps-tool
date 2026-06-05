@@ -2729,7 +2729,7 @@ function downloadAssessment() {
   var first = row['RecipientFirstName'] || '';
   var last  = row['RecipientLastName']  || '';
   var email = row['RecipientEmail'] || row['Personal Email'] || '';
-  var nameStr = (last && first) ? last + ', ' + first : (last || first || 'Candidate');
+  var nameStr = (first && last) ? first + ' ' + last : (first || last || 'Candidate');
   var recorded = row['RecordedDate'] || '';
   var dateStr = '';
   if (recorded) { try { var d = new Date(recorded); dateStr = (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); } catch(e){} }
@@ -2874,7 +2874,7 @@ function buildWordDoc(idx) {
   var email = row['RecipientEmail'] || row['Personal Email'] || '';
   var recorded = row['RecordedDate'] || '';
   var rid = row['ResponseId'] || '';
-  var nameStr = (last && first) ? last + ', ' + first : (last || first || 'Candidate');
+  var nameStr = (first && last) ? first + ' ' + last : (first || last || 'Candidate');
   var dateStr = '';
   if (recorded) { try { var d = new Date(recorded); dateStr = (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear(); } catch(e) {} }
   var today = new Date(); var todayStr = (today.getMonth()+1)+'/'+today.getDate()+'/'+today.getFullYear();
@@ -3081,26 +3081,47 @@ function buildWordDoc(idx) {
   var evalComment = row._evalComment || '';
   children.push(heading('Evaluator Comments'));
   if (evalComment) {
-    var commentParas = evalComment.split(/\n\n+/);
-    commentParas.forEach(function(cp) {
-      cp = cp.trim();
-      if (!cp) return;
-      if (cp.match(/^[-*]\s/m)) {
-        cp.split('\n').forEach(function(line) {
-          line = line.replace(/^[-*]\s+/, '').trim();
-          if (line) {
-            children.push(new D.Paragraph({
-              children: [new D.TextRun({ text: line, size: 20, font: 'Arial', color: '333333' })],
-              spacing: { before: 40, after: 40 },
-              indent: { left: 360 },
-              bullet: { level: 0 }
-            }));
-          }
-        });
+    // Split on single OR double newlines to preserve all paragraph breaks
+    var allLines = evalComment.split(/\n/);
+    var pendingLines = [];
+
+    function flushPending() {
+      if (!pendingLines.length) return;
+      var text = pendingLines.join(' ').trim();
+      pendingLines = [];
+      if (!text) return;
+      // Check if it's a bullet line
+      if (text.match(/^[-*]\s/)) {
+        text = text.replace(/^[-*]\s+/, '').trim();
+        children.push(new D.Paragraph({
+          children: [new D.TextRun({ text: text, size: 20, font: 'Arial', color: '333333' })],
+          spacing: { before: 40, after: 40 },
+          indent: { left: 360 },
+          bullet: { level: 0 }
+        }));
       } else {
-        children.push(para(cp, { color: '333333', before: 60, after: 60 }));
+        children.push(new D.Paragraph({
+          children: [new D.TextRun({ text: text, size: 20, font: 'Arial', color: '333333' })],
+          spacing: { before: 80, after: 80 }
+        }));
+      }
+    }
+
+    allLines.forEach(function(line) {
+      if (line.trim() === '') {
+        flushPending();
+      } else {
+        // Bullet lines always flush previous and stand alone
+        if (line.trim().match(/^[-*]\s/)) {
+          flushPending();
+          pendingLines.push(line.trim());
+          flushPending();
+        } else {
+          pendingLines.push(line.trim());
+        }
       }
     });
+    flushPending();
   } else {
     for (var ci = 0; ci < 6; ci++) {
       children.push(new D.Paragraph({
@@ -3148,8 +3169,8 @@ function downloadWordDoc(idx) {
   var last  = row['RecipientLastName']  || '';
   var today = new Date();
   var dateForFile = (today.getMonth()+1) + '-' + today.getDate() + '-' + today.getFullYear();
-  var filename = 'PSC_Appointment_' + (last||'Unknown') + '_' + (first||'') + '_' + dateForFile + '.docx';
-  filename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+  var filename = (first||'Unknown') + ' ' + (last||'') + ' Appointment Assessment Summer 2026.docx';
+  filename = filename.replace(/[^a-zA-Z0-9 \.\-]/g, '').trim();
 
   var doc = buildWordDoc(idx);
   if (!doc) return;
@@ -3182,8 +3203,8 @@ function downloadAllWordDocs() {
     if (!row._aiResult) return;
     var first = row['RecipientFirstName'] || '';
     var last  = row['RecipientLastName']  || '';
-    var filename = 'PSC_Appointment_' + (last||'Unknown') + '_' + (first||'') + '_' + dateForFile + '.docx';
-    filename = filename.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+    var filename = (first||'Unknown') + ' ' + (last||'') + ' Appointment Assessment Summer 2026.docx';
+    filename = filename.replace(/[^a-zA-Z0-9 \.\-]/g, '').trim();
     var doc = buildWordDoc(idx);
     if (!doc) return;
     var p = docx.Packer.toBlob(doc).then(function(blob) {
