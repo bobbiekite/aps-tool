@@ -1274,8 +1274,10 @@ function runBatchAssessments() {
           }
 
           S.rows[idx]._aiResult = result;
-
-          var _rr1 = (result.recommendedRank || '').toLowerCase().trim();
+          if (!S.rows[idx]._assessmentDate) {
+            var _ad = new Date();
+            S.rows[idx]._assessmentDate = (_ad.getMonth()+1) + '/' + _ad.getDate() + '/' + _ad.getFullYear();
+          }
           var rankKey = (_rr1.indexOf('associate') < 0 && _rr1.indexOf('assistant') < 0 && _rr1.indexOf('professor') >= 0) ? 'full'
             : _rr1.indexOf('associate') >= 0 ? 'associate'
             : 'assistant';
@@ -2086,7 +2088,7 @@ function buildPrompt(row) {
     '- 55-70%: Genuinely borderline — candidate could reasonably go either way. Flag for human review and Stage 3 clarification.\n' +
     '- Below 55%: Significant evidence gaps. Do not guess — stay at lower rank and flag what is missing.\n\n' +
 
-    'RATING SCALE: 4=Exceeds, 3=Meets, 2=Needs Improvement, 1=Unsatisfactory, N/A=Not Applicable\n' +
+    'RATING SCALE: 4=Exceeds, 3=Meets, 2=Needs Development, 1=Not Developed\n' +
     'RUBRIC WEIGHTS: Teaching Excellence 70%, Service 20%, Scholarship 10%\n\n' +
 
     '═══ TEACHING EXCELLENCE (70%) ═══\n\n' +
@@ -2339,7 +2341,10 @@ function runAIAssessment(idx) {
         }
       }
       row._aiResult = result;
-      // Generate follow-up questions for borderline cases (confidence < 80%)
+      if (!row._assessmentDate) {
+        var _ad2 = new Date();
+        row._assessmentDate = (_ad2.getMonth()+1) + '/' + _ad2.getDate() + '/' + _ad2.getFullYear();
+      }
       if (result.stage3Recommended || (result.confidence || 0) < 80) {
         generateFollowUpQuestions(S.rows.indexOf(row), function() {
           renderAssessment(aiEl, result, idx);
@@ -3007,18 +3012,14 @@ function buildWordDoc(idx) {
     labelValue('DU Email', email),
     labelValue('Submitted', dateStr),
     labelValue('Response ID', rid),
-    labelValue('Assessment Generated', todayStr),
+    labelValue('Assessment Generated', row._assessmentDate || todayStr),
+    labelValue('Final Assessment Generated', todayStr),
     divider(),
 
     // Rank recommendation
-    heading('Preliminary Rank Recommendation'),
     new D.Paragraph({
       children: [new D.TextRun({ text: r.recommendedRank||'', bold: true, size: 32, font: 'Arial', color: rankColor })],
       spacing: { before: 60, after: 40 }
-    }),
-    new D.Paragraph({
-      children: [new D.TextRun({ text: 'Confidence: ' + (r.confidence||0) + '%', bold: true, size: 20, font: 'Arial', color: '666666' })],
-      spacing: { before: 0, after: 100 }
     }),
     para(r.summary||'', { italics: true, color: '444444' }),
     (r.whyThisRank ? new D.Paragraph({
@@ -3072,61 +3073,19 @@ function buildWordDoc(idx) {
     children.push(divider());
   }
 
-  if (flagBlocks.length) {
-    children.push(heading('Flags & Gaps'));
-    flagBlocks.forEach(function(b) { children.push(b); });
-    children.push(divider());
-  }
-
-  // Follow-up interview questions (borderline cases only)
-  var fq = row._followUpQuestions;
-  if (fq && fq.questions && fq.questions.length) {
-    children.push(heading('Suggested Interview Follow-Up Questions'));
-    children.push(new D.Paragraph({
-      children: [new D.TextRun({
-        text: 'This candidate is borderline: ' + (fq.borderlineScenario || ''),
-        size: 19, font: 'Arial', color: '996600', italics: true
-      })],
-      spacing: { before: 0, after: 120 }
-    }));
-    fq.questions.forEach(function(q, qi) {
-      children.push(new D.Paragraph({
-        children: [new D.TextRun({ text: 'Gap: ' + (q.gap || ''), bold: true, size: 20, font: 'Arial', color: crimson })],
-        spacing: { before: 100, after: 40 }
-      }));
-      children.push(new D.Paragraph({
-        children: [new D.TextRun({ text: (qi + 1) + '.  ' + (q.question || ''), size: 21, font: 'Arial', color: '1a1a1a' })],
-        spacing: { before: 0, after: 40 },
-        indent: { left: 240 }
-      }));
-      if (q.whatToListenFor) {
-        children.push(new D.Paragraph({
-          children: [
-            new D.TextRun({ text: 'Listen for: ', bold: true, size: 18, font: 'Arial', color: '555555' }),
-            new D.TextRun({ text: q.whatToListenFor, size: 18, font: 'Arial', color: '777777', italics: true })
-          ],
-          spacing: { before: 0, after: 60 },
-          indent: { left: 240 }
-        }));
-      }
-    });
-    children.push(new D.Paragraph({ spacing: { before: 80, after: 0 } }));
-    children.push(divider());
-  }
+  children.push(new D.Paragraph({ spacing: { before: 160, after: 60 } }));
+  children.push(divider());
 
   // Evaluator comments (dean's personal note)
   var evalComment = row._evalComment || '';
   children.push(heading('Evaluator Comments'));
   if (evalComment) {
-    // Split into paragraphs on double newlines or single newlines
     var commentParas = evalComment.split(/\n\n+/);
-    commentParas.forEach(function(p) {
-      p = p.trim();
-      if (!p) return;
-      // Handle bullet points (lines starting with - or *)
-      if (p.match(/^[-*]\s/m)) {
-        var lines = p.split('\n');
-        lines.forEach(function(line) {
+    commentParas.forEach(function(cp) {
+      cp = cp.trim();
+      if (!cp) return;
+      if (cp.match(/^[-*]\s/m)) {
+        cp.split('\n').forEach(function(line) {
           line = line.replace(/^[-*]\s+/, '').trim();
           if (line) {
             children.push(new D.Paragraph({
@@ -3138,11 +3097,10 @@ function buildWordDoc(idx) {
           }
         });
       } else {
-        children.push(para(p, { color: '333333', before: 60, after: 60 }));
+        children.push(para(cp, { color: '333333', before: 60, after: 60 }));
       }
     });
   } else {
-    // Blank lines for manual entry
     for (var ci = 0; ci < 6; ci++) {
       children.push(new D.Paragraph({
         border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
@@ -3153,32 +3111,16 @@ function buildWordDoc(idx) {
   children.push(new D.Paragraph({ spacing: { before: 160, after: 60 } }));
   children.push(divider());
 
-  // Evaluator decision
-  children.push(heading('Evaluator Decision'));
-  ['Rank Confirmed', 'Rank Advancement', 'Support Plan', 'Rank Adjusted', 'Non-Reappointment'].forEach(function(opt) {
-    children.push(new D.Paragraph({
-      children: [new D.TextRun({ text: '\u2610  ' + opt, size: 22, font: 'Arial' })],
-      spacing: { before: 60, after: 60 }
-    }));
-  });
-  children.push(new D.Paragraph({ spacing: { before: 160, after: 60 } }));
-  children.push(para('Evaluator Comments:', { bold: true }));
-  for (var i = 0; i < 3; i++) {
-    children.push(new D.Paragraph({
-      border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
-      spacing: { before: 240, after: 0 }
-    }));
-  }
-  children.push(new D.Paragraph({ spacing: { before: 160, after: 60 } }));
+  // Faculty response lines
   children.push(para('Faculty Response / Comments:', { bold: true }));
-  for (var j = 0; j < 3; j++) {
+  for (var j = 0; j < 7; j++) {
     children.push(new D.Paragraph({
       border: { bottom: { style: D.BorderStyle.SINGLE, size: 2, color: 'CCCCCC', space: 1 } },
       spacing: { before: 240, after: 0 }
     }));
   }
   children.push(new D.Paragraph({ spacing: { before: 180, after: 0 } }));
-  children.push(para('This is a preliminary AI-assisted assessment based on survey responses, course evaluation data, and CV review. It does not replace human review, interviews, or the formal rubric evaluation. The evaluator retains full authority over the final rank determination.', { italics: true, color: '999999', size: 18 }));
+  children.push(para('This assessment is based on survey responses, course evaluation data, and CV review. It was performed first by AI and then by human review (the dean), along with the formal rubric evaluation. An adjunct faculty member who believes their initial rank assignment does not accurately reflect their qualifications may raise a concern through the associate dean of academic affairs, consistent with Section 5 of the APS Policies and Procedures. The concern should be submitted in writing within 7 days of receiving the offer package and must include specific evidence not captured or potentially misread in the original assessment, such as documentation of active industry engagement, discipline-specific experience, or other rubric-relevant materials. The dean retains authority under Section 1.3 to resolve ambiguities and may, as necessary, order a re-review of the applicant\'s materials against the APS evaluation rubric.', { italics: true, color: '999999', size: 18 }));
 
   return new D.Document({
     styles: { default: { document: { run: { font: 'Arial', size: 22 } } } },
