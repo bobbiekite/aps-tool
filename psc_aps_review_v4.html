@@ -3094,10 +3094,9 @@ function buildWordDoc(idx) {
       if (text.match(/^[-*]\s/)) {
         text = text.replace(/^[-*]\s+/, '').trim();
         children.push(new D.Paragraph({
-          children: [new D.TextRun({ text: text, size: 20, font: 'Arial', color: '333333' })],
+          children: [new D.TextRun({ text: '\u2022  ' + text, size: 20, font: 'Arial', color: '333333' })],
           spacing: { before: 40, after: 40 },
-          indent: { left: 360 },
-          bullet: { level: 0 }
+          indent: { left: 360 }
         }));
       } else {
         children.push(new D.Paragraph({
