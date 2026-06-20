@@ -2870,7 +2870,7 @@ function buildWordDoc(idx) {
 
   // Work from an en-dash-free deep copy so no en dashes reach the Word document.
   // (Original row._aiResult is left untouched so the on-screen view is unchanged.)
-  var r = deepStripEnDash(row._aiResult);
+  var r = deepCleanDashes(row._aiResult);
   var first = row['RecipientFirstName'] || '';
   var last  = row['RecipientLastName']  || '';
   var email = row['RecipientEmail'] || row['Personal Email'] || '';
@@ -2886,15 +2886,15 @@ function buildWordDoc(idx) {
     :(r.recommendedRank||'').toLowerCase().indexOf('associate')>=0?'associate':'assistant';
   var rankColor = rankKey==='full'?'276b43':rankKey==='associate'?'996600':'1a4d7a';
   var crimson = '8B1A2B';
-  // Wrap docx so EVERY text run in the document is en-dash-free, no matter where the
-  // text comes from (AI assessment, student eval comments, verbatim survey text, etc.).
+  // Wrap docx so EVERY text run in the document is free of em dashes and en dashes, no matter
+  // where the text comes from (AI assessment, student eval comments, verbatim survey text, etc.).
   var _OrigTextRun = docx.TextRun;
   var D = Object.create(docx);
   D.TextRun = function(arg) {
     if (typeof arg === 'string') {
-      arg = stripEnDash(arg);
+      arg = cleanDashes(arg);
     } else if (arg && typeof arg === 'object' && typeof arg.text === 'string') {
-      arg = Object.assign({}, arg, { text: stripEnDash(arg.text) });
+      arg = Object.assign({}, arg, { text: cleanDashes(arg.text) });
     }
     return new _OrigTextRun(arg);
   };
@@ -3091,7 +3091,7 @@ function buildWordDoc(idx) {
   children.push(divider());
 
   // Evaluator comments (dean's personal note)
-  var evalComment = stripEnDash(row._evalComment || '');
+  var evalComment = cleanDashes(row._evalComment || '');
   children.push(heading('Evaluator Comments'));
   if (evalComment) {
     // Split on single OR double newlines to preserve all paragraph breaks
@@ -3269,17 +3269,23 @@ function toggleDetail(idx) {
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-// Replace en dashes (U+2013) with hyphens so they never appear in generated output.
-function stripEnDash(s) {
-  return (s == null) ? s : String(s).replace(/\u2013/g, '-');
+// Replace the dash characters the AI tends to insert so they never reach generated output.
+// Em dash (U+2014, a parenthetical break) -> comma. En dash (U+2013) -> comma when used as a
+// spaced break, hyphen when used in a range (e.g. 2019-2023).
+function cleanDashes(s) {
+  if (s == null) return s;
+  return String(s)
+    .replace(/\s*\u2014\s*/g, ', ')
+    .replace(/\s+\u2013\s+/g, ', ')
+    .replace(/\u2013/g, '-');
 }
-// Recursively strip en dashes from every string in an object/array; returns a cleaned deep copy.
-function deepStripEnDash(v) {
-  if (typeof v === 'string') return stripEnDash(v);
-  if (Array.isArray(v)) return v.map(deepStripEnDash);
+// Recursively clean dashes in every string of an object/array; returns a cleaned deep copy.
+function deepCleanDashes(v) {
+  if (typeof v === 'string') return cleanDashes(v);
+  if (Array.isArray(v)) return v.map(deepCleanDashes);
   if (v && typeof v === 'object') {
     var out = {};
-    for (var k in v) { if (Object.prototype.hasOwnProperty.call(v, k)) out[k] = deepStripEnDash(v[k]); }
+    for (var k in v) { if (Object.prototype.hasOwnProperty.call(v, k)) out[k] = deepCleanDashes(v[k]); }
     return out;
   }
   return v;
